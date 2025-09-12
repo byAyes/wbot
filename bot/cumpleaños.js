@@ -81,7 +81,7 @@ async function guardarCumpleaños(message) {
 }
 
 // Función para mostrar todos los cumpleaños
-async function mostrarCumpleaños(message) {
+async function mostrarCumpleaños(message, client) {
     ensureBirthdaysFile();
 
     try {
@@ -113,12 +113,27 @@ async function mostrarCumpleaños(message) {
         birthdaysWithRemainingDays.sort((a, b) => a.remainingDays - b.remainingDays);
 
         let response = '🎂 *Próximos Cumpleaños* 🎂\n\n';
-        birthdaysWithRemainingDays.forEach(entry => {
+        
+        const birthdayPromises = birthdaysWithRemainingDays.map(async (entry) => {
             const birthdayParts = entry.birthday.split('-');
             const day = birthdayParts[0];
             const month = getMonthName(parseInt(birthdayParts[1], 10));
-            response += `🎁 ${entry.mention} - *${day} de ${month}* (Faltan ${entry.remainingDays} días)\n`;
+            
+            let name = entry.mention; // fallback
+            try {
+                const contact = await client.getContactById(entry.userId);
+                if (contact) {
+                    name = contact.pushname || contact.name || entry.mention;
+                }
+            } catch (error) {
+                console.error(`Could not get contact for ${entry.userId}`, error);
+            }
+            
+            return `🎁 ${name} - *${day} de ${month}* (Faltan ${entry.remainingDays} días)`;
         });
+
+        const birthdayLines = await Promise.all(birthdayPromises);
+        response += birthdayLines.join('\n');
 
         message.reply(response);
 
