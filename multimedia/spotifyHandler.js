@@ -3,16 +3,18 @@ const axios = require('axios');
 /**
  * Maneja la búsqueda de canciones desde Spotify.
  * @param {string} query - Término de búsqueda proporcionado por el usuario.
- * @param {object} message - Mensaje original para responder con la información.
+ * @param {object} msg - Mensaje original para responder con la información.
+ * @param {object} sock - Instancia del socket de Baileys.
  */
-async function manejarSpotify(query, message) {
+async function manejarSpotify(query, msg, sock) {
     if (!query) {
-        message.reply('Por favor, proporciona el nombre de la canción o artista que deseas buscar.');
+        await sock.sendMessage(msg.key.remoteJid, { text: 'Por favor, proporciona el nombre de la canción o artista que deseas buscar.' }, { quoted: msg });
         return;
     }
 
     try {
-        message.react('⌛');
+        await sock.readMessages([msg.key]);
+        await sock.sendMessage(msg.key.remoteJid, { react: { text: '⌛', key: msg.key } });
 
         // Buscar información de la canción
         const busqueda = await buscarSpotify(query);
@@ -25,13 +27,13 @@ async function manejarSpotify(query, message) {
         // Enviar información detallada al usuario con la opción de descarga
         const info = `🎵 *Título:* ${cancion.title}\n🎤 *Artista:* ${cancion.artist}\n💺 *Álbum:* ${cancion.album}\n⏳ *Duración:* ${cancion.duration}\n🔗 *Enlace:* ${cancion.url}\n\n¿Quieres descargar la canción? Escribe 'si'`;
 
-        await message.reply(info);
+        await sock.sendMessage(msg.key.remoteJid, { text: info }, { quoted: msg });
 
-        message.react('✅');
+        await sock.sendMessage(msg.key.remoteJid, { react: { text: '✅', key: msg.key } });
     } catch (error) {
         console.error('Error al procesar la solicitud de Spotify:', error.message);
-        message.react('❌');
-        message.reply('❌ Ocurrió un error al procesar tu solicitud.');
+        await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
+        await sock.sendMessage(msg.key.remoteJid, { text: '❌ Ocurrió un error al procesar tu solicitud.' }, { quoted: msg });
     }
 }
 
