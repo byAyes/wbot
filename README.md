@@ -1,4 +1,4 @@
-# wbot# WBot - Tu Asistente de WhatsApp
+# cBotWA - Tu Asistente de WhatsApp
 
 ¡Bienvenido a WBot, tu asistente personal para WhatsApp! Este bot te permite descargar contenido multimedia de varias plataformas directamente en tus chats.
 
@@ -8,7 +8,7 @@
 
 ## ✨ Funcionalidades
 
-WBot ofrece una variedad de funciones para enriquecer tu experiencia en WhatsApp:
+cBotWA ofrece una variedad de funciones para enriquecer tu experiencia en WhatsApp:
 
 - **Descarga de YouTube:** Busca y descarga videos o audios de YouTube.
 - **Descarga de Pinterest:** Descarga videos e imágenes desde enlaces de Pinterest.
