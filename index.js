@@ -9,6 +9,7 @@ const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = requ
 const { descargarPinterest } = require('./multimedia/pinterest.js');
 const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
 const puppeteer = require('puppeteer');
+const { spawn } = require('child_process');
 
 const app = express();
 app.use(bodyParser.json());
@@ -134,6 +135,15 @@ client.on('message_create', async (message) => {
         await guardarCumpleaños(message);
     } else if (bodyLower === '.cumpleaños') {
         await mostrarCumpleaños(message);
+    } else if (bodyLower === '.reset') {
+        console.log('Reiniciando el bot...');
+        await client.sendMessage(message.to, 'Reiniciando...');
+        const child = spawn(process.argv[0], process.argv.slice(1), {
+            detached: true,
+            stdio: 'inherit'
+        });
+        child.unref();
+        process.exit();
     }
 });
 
