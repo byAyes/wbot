@@ -7,6 +7,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const { manejarSpotify } = require('./multimedia/spotifyHandler');
 const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = require('./multimedia/youtube.js');
 const { descargarPinterest } = require('./multimedia/pinterest.js');
+const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
 const puppeteer = require('puppeteer');
 
 const app = express();
@@ -65,8 +66,8 @@ client.on('message', async (message) => {
             message.react('⌛');
             const quotedBody = quotedMsg.body;
 
-            const titleMatch = quotedBody.match(/🎵 \*Título:\* (.*)/);
-            const artistMatch = quotedBody.match(/🎤 \*Artista:\* (.*)/);
+            const titleMatch = quotedBody.match(/🎵 *Título: * (.*)/);
+            const artistMatch = quotedBody.match(/🎤 *Artista: * (.*)/);
 
             if (titleMatch && artistMatch) {
                 const title = titleMatch[1].trim();
@@ -92,8 +93,50 @@ client.on('message', async (message) => {
         const command = body.split(' ')[0];
         const query = body.substring(command.length).trim();
         await manejarSpotify(query, message);
+    } else if (bodyLower.startsWith('.bd')) {
+        await guardarCumpleaños(message);
+    } else if (bodyLower === '.cumpleaños') {
+        await mostrarCumpleaños(message);
     }
 });
+
+// Manejar mensajes propios (comandos desde el número del bot)
+client.on('message_create', async (message) => {
+    // Reaccionar solo a los mensajes enviados por nosotros mismos
+    if (!message.fromMe) return;
+
+    const body = message.body;
+    const bodyLower = body.toLowerCase().trim();
+
+    const isPlayCommand = bodyLower.startsWith('.p ') || bodyLower.startsWith('.play ') || bodyLower.startsWith('.d ') || bodyLower.startsWith('.descargar ');
+
+    if (isPlayCommand) {
+        const command = body.split(' ')[0];
+        const content = body.substring(command.length).trim();
+
+        if (!content) {
+            // No podemos usar .reply en nuestros propios mensajes, así que enviamos uno nuevo.
+            return client.sendMessage(message.to, 'Por favor, proporciona un término de búsqueda o una URL.');
+        }
+
+        // Derivar a la función correcta según el contenido
+        if (content.includes('pinterest.com')) {
+            await descargarPinterest(content, message);
+        } else {
+            await manejarBusquedaYouTube(content, message, client);
+        }
+
+    } else if (bodyLower.startsWith('.spotify') || bodyLower.startsWith('.s') || bodyLower.startsWith('.sp')) {
+        const command = body.split(' ')[0];
+        const query = body.substring(command.length).trim();
+        await manejarSpotify(query, message);
+    } else if (bodyLower.startsWith('.bd')) {
+        await guardarCumpleaños(message);
+    } else if (bodyLower === '.cumpleaños') {
+        await mostrarCumpleaños(message);
+    }
+});
+
 
 // Iniciar el cliente
 client.initialize();
@@ -101,10 +144,7 @@ client.initialize();
 // Iniciar el servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
-    if (WHATSAPP_TOKEN === 'TU_TOKEN_DE_ACCESO' || VERIFY_TOKEN === 'TU_TOKEN_DE_VERIFICACION') {
-        console.warn('ADVERTENCIA: Aún no has configurado tus tokens de WhatsApp en el archivo index.js.');
-    }
+    console.log(`🟢 Servidor escuchando en el puerto ${PORT} 🟢`);
 });
 
 // Configuración global para Puppeteer
