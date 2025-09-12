@@ -1,165 +1,121 @@
 require('dotenv').config();
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const { useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
 const express = require('express');
 const bodyParser = require('body-parser');
-const axios = require('axios');
 const qrcode = require('qrcode-terminal');
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const pino = require('pino');
 const { manejarSpotify } = require('./multimedia/spotifyHandler');
 const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = require('./multimedia/youtube.js');
 const { descargarPinterest } = require('./multimedia/pinterest.js');
 const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
-const puppeteer = require('puppeteer');
 const { spawn } = require('child_process');
 
 const app = express();
 app.use(bodyParser.json());
 
-// --- Configuración del Bot ---
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || 'TU_TOKEN_DE_ACCESO';
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'TU_TOKEN_DE_VERIFICACION';
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID || 'ID_DE_TU_NUMERO_DE_TELEFONO';
+async function connectToWhatsApp() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    const sock = makeWASocket({
+        auth: state,
+        logger: pino({ level: 'silent' })
+    });
 
-// Inicializar el cliente de WhatsApp
-const client = new Client({
-    authStrategy: new LocalAuth({
-        clientId: 'wbot-session'
-    })
-});
+    sock.ev.on('creds.update', saveCreds);
 
-client.on('qr', (qr) => {
-    console.log('Escanea este código QR con tu aplicación de WhatsApp:');
-    qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', () => {
-    console.log('El cliente está listo para usar.');
-});
-
-client.on('auth_failure', (msg) => {
-    console.error('Error de autenticación:', msg);
-});
-
-// Manejar mensajes entrantes
-client.on('message', async (message) => {
-    const body = message.body;
-    const bodyLower = body.toLowerCase().trim();
-
-    const isPlayCommand = bodyLower.startsWith('.p ') || bodyLower.startsWith('.play ') || bodyLower.startsWith('.d ') || bodyLower.startsWith('.descargar ');
-
-    if (isPlayCommand) {
-        const command = body.split(' ')[0];
-        const content = body.substring(command.length).trim();
-
-        if (!content) {
-            return message.reply('Por favor, proporciona un término de búsqueda o una URL.');
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        if(qr) {
+            qrcode.generate(qr, {small: true});
         }
-
-        // Derivar a la función correcta según el contenido
-        if (content.includes('pinterest.com')) {
-            await descargarPinterest(content, message);
-        } else {
-            await manejarBusquedaYouTube(content, message, client);
-        }
-
-    } else if ((bodyLower === 'si' || bodyLower === 'sí') && message.hasQuotedMsg) {
-        const quotedMsg = await message.getQuotedMessage();
-        if (quotedMsg.fromMe && quotedMsg.body.includes('¿Quieres descargar la canción?')) {
-            message.react('⌛');
-            const quotedBody = quotedMsg.body;
-
-            const titleMatch = quotedBody.match(/🎵 *Título: * (.*)/);
-            const artistMatch = quotedBody.match(/🎤 *Artista: * (.*)/);
-
-            if (titleMatch && artistMatch) {
-                const title = titleMatch[1].trim();
-                const artist = artistMatch[1].trim();
-                const searchTerm = `${title} ${artist}`;
-
-                const statusMsg = await message.reply(`Buscando "${searchTerm}" en YouTube...`);
-                
-                const videoResult = await buscarPrimerVideoAPI(searchTerm);
-
-                if (videoResult && videoResult.url) {
-                    await descargarAudioAPI(videoResult.url, statusMsg);
-                } else {
-                    await statusMsg.edit(`No se encontraron resultados para "${searchTerm}" en YouTube.`);
-                    message.react('❌');
-                }
-            } else {
-                message.reply('No pude encontrar el título y artista en el mensaje original.');
-                message.react('❌');
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+            // reconnect if not logged out
+            if (shouldReconnect) {
+                connectToWhatsApp();
             }
+        } else if (connection === 'open') {
+            console.log('opened connection');
         }
-    } else if (bodyLower.startsWith('.spotify') || bodyLower.startsWith('.s') || bodyLower.startsWith('.sp')) {
-        const command = body.split(' ')[0];
-        const query = body.substring(command.length).trim();
-        await manejarSpotify(query, message);
-    } else if (bodyLower.startsWith('.bd')) {
-        await guardarCumpleaños(message);
-    } else if (bodyLower === '.cumpleaños') {
-        await mostrarCumpleaños(message);
-    }
-});
+    });
 
-// Manejar mensajes propios (comandos desde el número del bot)
-client.on('message_create', async (message) => {
-    // Reaccionar solo a los mensajes enviados por nosotros mismos
-    if (!message.fromMe) return;
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages[0];
+        if (!msg.message) return;
 
-    const body = message.body;
-    const bodyLower = body.toLowerCase().trim();
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        const bodyLower = body.toLowerCase().trim();
 
-    const isPlayCommand = bodyLower.startsWith('.p ') || bodyLower.startsWith('.play ') || bodyLower.startsWith('.d ') || bodyLower.startsWith('.descargar ');
+        const isPlayCommand = bodyLower.startsWith('.p ') || bodyLower.startsWith('.play ') || bodyLower.startsWith('.d ') || bodyLower.startsWith('.descargar ');
 
-    if (isPlayCommand) {
-        const command = body.split(' ')[0];
-        const content = body.substring(command.length).trim();
+        if (isPlayCommand) {
+            const command = body.split(' ')[0];
+            const content = body.substring(command.length).trim();
 
-        if (!content) {
-            // No podemos usar .reply en nuestros propios mensajes, así que enviamos uno nuevo.
-            return client.sendMessage(message.to, 'Por favor, proporciona un término de búsqueda o una URL.');
+            if (!content) {
+                return sock.sendMessage(msg.key.remoteJid, { text: 'Por favor, proporciona un término de búsqueda o una URL.' }, { quoted: msg });
+            }
+
+            if (content.includes('pinterest.com')) {
+                await descargarPinterest(content, msg, sock);
+            } else {
+                await manejarBusquedaYouTube(content, msg, sock);
+            }
+        } else if ((bodyLower === 'si' || bodyLower === 'sí') && msg.message.extendedTextMessage?.contextInfo?.quotedMessage) {
+            const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
+            const quotedBody = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || '';
+
+            if (quotedBody.includes('¿Quieres descargar la canción?')) {
+                await sock.sendMessage(msg.key.remoteJid, { react: { text: '⌛', key: msg.key } });
+                const titleMatch = quotedBody.match(/🎵 *Título: * (.*)/);
+                const artistMatch = quotedBody.match(/🎤 *Artista: * (.*)/);
+
+                if (titleMatch && artistMatch) {
+                    const title = titleMatch[1].trim();
+                    const artist = artistMatch[1].trim();
+                    const searchTerm = `${title} ${artist}`;
+
+                    const statusMsg = await sock.sendMessage(msg.key.remoteJid, { text: `Buscando "${searchTerm}" en YouTube...` }, { quoted: msg });
+
+                    const videoResult = await buscarPrimerVideoAPI(searchTerm);
+
+                    if (videoResult && videoResult.url) {
+                        await descargarAudioAPI(videoResult.url, statusMsg, sock);
+                    } else {
+                        await sock.sendMessage(msg.key.remoteJid, { text: `No se encontraron resultados para "${searchTerm}" en YouTube.` }, { quoted: msg });
+                        await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
+                    }
+                } else {
+                    await sock.sendMessage(msg.key.remoteJid, { text: 'No pude encontrar el título y artista en el mensaje original.' }, { quoted: msg });
+                    await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
+                }
+            }
+        } else if (bodyLower.startsWith('.spotify') || bodyLower.startsWith('.s') || bodyLower.startsWith('.sp')) {
+            const command = body.split(' ')[0];
+            const query = body.substring(command.length).trim();
+            await manejarSpotify(query, msg, sock);
+        } else if (bodyLower.startsWith('.bd')) {
+            await guardarCumpleaños(msg, sock);
+        } else if (bodyLower === '.cumpleaños') {
+            await mostrarCumpleaños(msg, sock);
+        } else if (bodyLower === '.reset') {
+            console.log('Reiniciando el bot...');
+            await sock.sendMessage(msg.key.remoteJid, { text: 'Reiniciando...' });
+            const child = spawn(process.argv[0], process.argv.slice(1), {
+                detached: true,
+                stdio: 'inherit'
+            });
+            child.unref();
+            process.exit();
         }
+    });
+}
 
-        // Derivar a la función correcta según el contenido
-        if (content.includes('pinterest.com')) {
-            await descargarPinterest(content, message);
-        } else {
-            await manejarBusquedaYouTube(content, message, client);
-        }
+connectToWhatsApp();
 
-    } else if (bodyLower.startsWith('.spotify') || bodyLower.startsWith('.s') || bodyLower.startsWith('.sp')) {
-        const command = body.split(' ')[0];
-        const query = body.substring(command.length).trim();
-        await manejarSpotify(query, message);
-    } else if (bodyLower.startsWith('.bd')) {
-        await guardarCumpleaños(message);
-    } else if (bodyLower === '.cumpleaños') {
-        await mostrarCumpleaños(message);
-    } else if (bodyLower === '.reset') {
-        console.log('Reiniciando el bot...');
-        await client.sendMessage(message.to, 'Reiniciando...');
-        const child = spawn(process.argv[0], process.argv.slice(1), {
-            detached: true,
-            stdio: 'inherit'
-        });
-        child.unref();
-        process.exit();
-    }
-});
-
-
-// Iniciar el cliente
-client.initialize();
-
-// Iniciar el servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🟢 Servidor escuchando en el puerto ${PORT} 🟢`);
 });
-
-// Configuración global para Puppeteer
-(async () => {
-    const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-})();

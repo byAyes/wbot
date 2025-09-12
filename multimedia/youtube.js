@@ -1,21 +1,11 @@
-const { MessageMedia } = require('whatsapp-web.js');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 // --- Funciones Auxiliares ---
-
-const animateMessage = (message, text) => {
-    let dots = 0;
-    const interval = setInterval(() => {
-        dots = (dots + 1) % 4;
-        const dotString = '.'.repeat(dots);
-        message.edit(text + dotString).catch(() => clearInterval(interval));
-    }, 800);
-    return interval;
-};
 
 async function buscarPrimerVideoAPI(searchTerm) {
     try {
         const searchResponse = await fetch(`${process.env.API_URL}/search/yt?query=${encodeURIComponent(searchTerm)}&apikey=${process.env.API_KEY}`);
-        const searchResult = await searchResponse.json();
+        const searchResult = await response.json();
         if (searchResult.status && searchResult.result?.length) {
             return searchResult.result[0];
         }
@@ -28,105 +18,66 @@ async function buscarPrimerVideoAPI(searchTerm) {
 
 // --- Manejador de Comandos ---
 
-async function manejarBusquedaYouTube(searchTerm, message, client) {
-    const statusMsg = await message.reply(`Buscando "${searchTerm}" en YouTube...`);
+async function manejarBusquedaYouTube(searchTerm, msg, sock) {
+    const statusMsg = await sock.sendMessage(msg.key.remoteJid, { text: `Buscando "${searchTerm}" en YouTube...` }, { quoted: msg });
     try {
         const firstResult = await buscarPrimerVideoAPI(searchTerm);
 
         if (!firstResult) {
-            return await statusMsg.edit('❌ No se encontraron resultados para tu búsqueda.');
+            return await sock.sendMessage(msg.key.remoteJid, { text: '❌ No se encontraron resultados para tu búsqueda.' }, { quoted: msg });
         }
 
         const { title, autor, duration, url } = firstResult;
-        const confirmationText = `Encontré esto:
+        const confirmationText = `Encontré esto:\n\n🎵 *Título:* ${title}\n👤 *Autor:* ${autor}\n⏳ *Duración:* ${duration}\n\n¿Descargar como audio o video? Responde "audio" o "video".`;
+        await sock.sendMessage(msg.key.remoteJid, { text: confirmationText }, { quoted: msg });
 
-🎵 *Título:* ${title}
-👤 *Autor:* ${autor}
-⏳ *Duración:* ${duration}
-
-¿Descargar como audio o video? Responde "audio" o "video".`;
-        await statusMsg.edit(confirmationText);
-
-        const listener = async (reply) => {
-            if (reply.from === message.from) {
-                const choice = reply.body.toLowerCase().trim();
-                if (choice === 'audio' || choice === 'video') {
-                    client.removeListener('message', listener);
-                    if (choice === 'audio') {
-                        await descargarAudioAPI(url, statusMsg);
-                    } else {
-                        await descargarVideoAPI(url, statusMsg);
-                    }
-                }
-            }
-        };
-
-        client.on('message', listener);
-
-        setTimeout(() => {
-            const stillListening = client.listeners('message').some(l => l.toString() === listener.toString());
-            if (stillListening) {
-                client.removeListener('message', listener);
-                statusMsg.edit('⏰ Tiempo de espera agotado.');
-            }
-        }, 30000);
+        // Baileys doesn't have a concept of a message listener like wweb.js
+        // The logic for handling the "audio" or "video" response is now in index.js
+        // This function is now responsible for just the search and confirmation
 
     } catch (error) {
         console.error('Error en manejarBusquedaYouTube:', error.message);
-        await statusMsg.edit('Hubo un error al procesar tu búsqueda.');
+        await sock.sendMessage(msg.key.remoteJid, { text: 'Hubo un error al procesar tu búsqueda.' }, { quoted: msg });
     }
 }
 
 // --- Funciones de Descarga ---
 
-async function descargarAudioAPI(url, statusMsg) {
-    let animationInterval;
+async function descargarAudioAPI(url, statusMsg, sock) {
     try {
-        const initialText = 'Obteniendo enlace de audio de la API';
-        animationInterval = animateMessage(statusMsg, initialText);
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: 'Obteniendo enlace de audio de la API' }, { quoted: statusMsg });
         const response = await fetch(`${process.env.API_URL}/dow/ytmp3v2?url=${encodeURIComponent(url)}&apikey=${process.env.API_KEY}`);
         const result = await response.json();
-        clearInterval(animationInterval);
 
         if (!result.status || !result.data?.dl) {
-            return await statusMsg.edit('🐼 Error al obtener el audio desde la API.');
+            return await sock.sendMessage(statusMsg.key.remoteJid, { text: '🐼 Error al obtener el audio desde la API.' }, { quoted: statusMsg });
         }
 
         const { dl, title } = result.data;
-        const downloadText = `Descargando audio: *${title}*`;
-        animationInterval = animateMessage(statusMsg, downloadText);
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: `Descargando audio: *${title}*` }, { quoted: statusMsg });
 
-        const media = await MessageMedia.fromUrl(dl, { unsafeMime: true });
-        clearInterval(animationInterval);
-        media.mimetype = 'audio/mpeg';
-        
-        const chat = await statusMsg.getChat();
-        await chat.sendMessage(media, { sendAudioAsVoice: false });
-        await statusMsg.edit('✅ Audio enviado');
+        await sock.sendMessage(statusMsg.key.remoteJid, { audio: { url: dl }, mimetype: 'audio/mpeg' }, { quoted: statusMsg });
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: '✅ Audio enviado' }, { quoted: statusMsg });
 
     } catch (error) {
-        if (animationInterval) clearInterval(animationInterval);
         console.error('Error en descarga de audio (API):', error);
-        await statusMsg.edit('Hubo un error al descargar el audio.');
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: 'Hubo un error al descargar el audio.' }, { quoted: statusMsg });
     }
 }
 
-async function descargarVideoAPI(url, statusMsg) {
-    let animationInterval;
+async function descargarVideoAPI(url, statusMsg, sock) {
     try {
-        const initialText = 'Obteniendo enlace de video de la API';
-        animationInterval = animateMessage(statusMsg, initialText);
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: 'Obteniendo enlace de video de la API' }, { quoted: statusMsg });
         const apiResponse = await fetch(`${process.env.API_URL}/dow/ytmp4v2?url=${encodeURIComponent(url)}&apikey=${process.env.API_KEY}`);
         const result = await apiResponse.json();
-        clearInterval(animationInterval);
 
         if (!result.status || !result.data?.dl) {
-            return await statusMsg.edit('🐼 Error al obtener el video desde la API.');
+            return await sock.sendMessage(statusMsg.key.remoteJid, { text: '🐼 Error al obtener el video desde la API.' }, { quoted: statusMsg });
         }
 
         const { dl, title } = result.data;
 
-        await statusMsg.edit('Comprobando tamaño del video...');
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: 'Comprobando tamaño del video...' }, { quoted: statusMsg });
         const headResponse = await fetch(dl, { method: 'HEAD' });
         const contentLength = headResponse.headers.get('Content-Length');
         const fileSizeMB = parseInt(contentLength || '0', 10) / (1024 * 1024);
@@ -135,28 +86,17 @@ async function descargarVideoAPI(url, statusMsg) {
         const asDocument = fileSizeMB >= limit;
 
         if (asDocument) {
-            await statusMsg.edit(`El video pesa ${fileSizeMB.toFixed(2)} MB. Se enviará como documento.`);
+            await sock.sendMessage(statusMsg.key.remoteJid, { text: `El video pesa ${fileSizeMB.toFixed(2)} MB. Se enviará como documento.` }, { quoted: statusMsg });
         }
 
-        const downloadText = `Descargando video: *${title}*`;
-        animationInterval = animateMessage(statusMsg, downloadText);
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: `Descargando video: *${title}*` }, { quoted: statusMsg });
 
-        const media = await MessageMedia.fromUrl(dl, { unsafeMime: true });
-        clearInterval(animationInterval);
-        
-        const chat = await statusMsg.getChat();
-        const options = { caption: title };
-        if (asDocument) {
-            options.sendMediaAsDocument = true;
-        }
-        
-        await chat.sendMessage(media, options);
-        await statusMsg.edit('✅ Video enviado');
+        await sock.sendMessage(statusMsg.key.remoteJid, { video: { url: dl }, caption: title }, { quoted: statusMsg });
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: '✅ Video enviado' }, { quoted: statusMsg });
 
     } catch (error) {
-        if (animationInterval) clearInterval(animationInterval);
         console.error('Error en descarga de video (API):', error);
-        await statusMsg.edit('Hubo un error al descargar el video.');
+        await sock.sendMessage(statusMsg.key.remoteJid, { text: 'Hubo un error al descargar el video.' }, { quoted: statusMsg });
     }
 }
 

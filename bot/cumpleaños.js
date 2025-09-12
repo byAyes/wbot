@@ -17,19 +17,19 @@ function getMonthName(monthNumber) {
 }
 
 // Función para guardar un cumpleaños
-async function guardarCumpleaños(message) {
-    const body = message.body.trim();
-    const parts = body.split(' ');
+async function guardarCumpleaños(msg, sock) {
+    const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const parts = body.trim().split(' ');
 
     if (parts.length !== 2) {
-        return message.reply('Formato incorrecto. Usa: .bd DD-MM-YYYY');
+        return sock.sendMessage(msg.key.remoteJid, { text: 'Formato incorrecto. Usa: .bd DD-MM-YYYY' }, { quoted: msg });
     }
 
     const dateString = parts[1];
     const dateParts = dateString.split('-');
 
     if (dateParts.length !== 3) {
-        return message.reply('Formato de fecha incorrecto. Usa: DD-MM-YYYY');
+        return sock.sendMessage(msg.key.remoteJid, { text: 'Formato de fecha incorrecto. Usa: DD-MM-YYYY' }, { quoted: msg });
     }
 
     const day = parseInt(dateParts[0], 10);
@@ -37,24 +37,23 @@ async function guardarCumpleaños(message) {
     const year = parseInt(dateParts[2], 10);
 
     if (isNaN(day) || isNaN(month) || isNaN(year)) {
-        return message.reply('La fecha contiene caracteres no válidos. Usa: DD-MM-YYYY');
+        return sock.sendMessage(msg.key.remoteJid, { text: 'La fecha contiene caracteres no válidos. Usa: DD-MM-YYYY' }, { quoted: msg });
     }
 
     // Validaciones básicas de fecha
     if (month < 1 || month > 12) {
-        return message.reply('El mes debe estar entre 1 y 12.');
+        return sock.sendMessage(msg.key.remoteJid, { text: 'El mes debe estar entre 1 y 12.' }, { quoted: msg });
     }
     if (day < 1 || day > 31) { // Simplificado, se puede mejorar con lógica de días por mes
-        return message.reply('El día no es válido.');
+        return sock.sendMessage(msg.key.remoteJid, { text: 'El día no es válido.' }, { quoted: msg });
     }
 
     ensureBirthdaysFile();
 
     try {
         const birthdaysData = JSON.parse(fs.readFileSync(birthdaysFilePath, 'utf8'));
-        const userId = message.from;
-        const contact = await message.getContact();
-        const mention = `@${contact.id.user}`;
+        const userId = msg.key.remoteJid;
+        const mention = `@${userId.split('@')[0]}`;
 
         const monthName = getMonthName(month);
 
@@ -65,30 +64,30 @@ async function guardarCumpleaños(message) {
             birthdaysData[existingEntryIndex].birthday = dateString;
             birthdaysData[existingEntryIndex].month = monthName;
             birthdaysData[existingEntryIndex].mention = mention;
-            message.reply(`He actualizado tu fecha de cumpleaños a: ${day} de ${monthName} de ${year}.`);
+            await sock.sendMessage(msg.key.remoteJid, { text: `He actualizado tu fecha de cumpleaños a: ${day} de ${monthName} de ${year}.` }, { quoted: msg });
         } else {
             // Agregar nuevo cumpleaños
             birthdaysData.push({ userId, mention, birthday: dateString, month: monthName });
-            message.reply(`¡He guardado tu cumpleaños! ${mention}, te recordaré el ${day} de ${monthName}.`);
+            await sock.sendMessage(msg.key.remoteJid, { text: `¡He guardado tu cumpleaños! ${mention}, te recordaré el ${day} de ${monthName}.` }, { quoted: msg });
         }
 
         fs.writeFileSync(birthdaysFilePath, JSON.stringify(birthdaysData, null, 2), 'utf8');
 
     } catch (error) {
         console.error('Error al guardar el cumpleaños:', error);
-        message.reply('Hubo un error al guardar tu cumpleaños. Por favor, inténtalo de nuevo.');
+        await sock.sendMessage(msg.key.remoteJid, { text: 'Hubo un error al guardar tu cumpleaños. Por favor, inténtalo de nuevo.' }, { quoted: msg });
     }
 }
 
 // Función para mostrar todos los cumpleaños
-async function mostrarCumpleaños(message) {
+async function mostrarCumpleaños(msg, sock) {
     ensureBirthdaysFile();
 
     try {
         const birthdaysData = JSON.parse(fs.readFileSync(birthdaysFilePath, 'utf8'));
 
         if (birthdaysData.length === 0) {
-            return message.reply('Todavía no hay cumpleaños guardados.');
+            return sock.sendMessage(msg.key.remoteJid, { text: 'Todavía no hay cumpleaños guardados.' }, { quoted: msg });
         }
 
         const today = new Date();
@@ -98,7 +97,7 @@ async function mostrarCumpleaños(message) {
             const birthDateParts = entry.birthday.split('-');
             const birthDay = parseInt(birthDateParts[0], 10);
             const birthMonth = parseInt(birthDateParts[1], 10) - 1;
-            
+
             let nextBirthday = new Date(today.getFullYear(), birthMonth, birthDay);
             if (nextBirthday < today) {
                 nextBirthday.setFullYear(today.getFullYear() + 1);
@@ -120,11 +119,11 @@ async function mostrarCumpleaños(message) {
             response += `🎁 ${entry.mention} - *${day} de ${month}* (Faltan ${entry.remainingDays} días)\n`;
         });
 
-        message.reply(response);
+        await sock.sendMessage(msg.key.remoteJid, { text: response }, { quoted: msg });
 
     } catch (error) {
         console.error('Error al mostrar los cumpleaños:', error);
-        message.reply('Hubo un error al mostrar los cumpleaños. Por favor, inténtalo de nuevo.');
+        await sock.sendMessage(msg.key.remoteJid, { text: 'Hubo un error al mostrar los cumpleaños. Por favor, inténtalo de nuevo.' }, { quoted: msg });
     }
 }
 
