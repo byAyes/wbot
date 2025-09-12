@@ -96,7 +96,7 @@ client.on('message', async (message) => {
     } else if (bodyLower.startsWith('.bd')) {
         await guardarCumpleaños(message);
     } else if (bodyLower === '.cumpleaños') {
-        await mostrarCumpleaños(message, client);
+        await mostrarCumpleaños(message);
     }
 });
 
@@ -133,7 +133,7 @@ client.on('message_create', async (message) => {
     } else if (bodyLower.startsWith('.bd')) {
         await guardarCumpleaños(message);
     } else if (bodyLower === '.cumpleaños') {
-        await mostrarCumpleaños(message, client);
+        await mostrarCumpleaños(message);
     }
 });
 
