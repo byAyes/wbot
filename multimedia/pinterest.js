@@ -1,7 +1,5 @@
 const axios = require('axios');
 
-const ALTERNATIVE_API_URL = 'https://api.siputzx.my.id';
-
 /**
  * Normaliza una URL de Pinterest eliminando subdominios de país (ej. co, es, mx).
  * @param {string} url - La URL de Pinterest original.
@@ -65,7 +63,7 @@ async function descargarPinterest(url, msg, sock, retries = 3) {
     for (let i = 0; i < retries; i++) {
         try {
             const normalizedUrl = normalizarUrlPinterest(url);
-            const alternativeApiUrl = `${ALTERNATIVE_API_URL}/api/d/pinterest?url=${encodeURIComponent(normalizedUrl)}`; // Asumiendo que la API alternativa tiene un endpoint similar
+            const alternativeApiUrl = `${process.env.ALTERNATIVE_API_URL}/api/d/pinterest?url=${encodeURIComponent(normalizedUrl)}`; // Asumiendo que la API alternativa tiene un endpoint similar
             console.log('Pinterest API URL (Alternativa):', alternativeApiUrl);
 
             const response = await axios.get(alternativeApiUrl, {

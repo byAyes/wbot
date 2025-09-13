@@ -88,7 +88,7 @@ async function descargarSpotifyDirecto(spotifyUrl, msg, sock, retries = 3) {
 
     for (let i = 0; i < retries; i++) {
         try {
-            const apiUrl = `https://api.siputzx.my.id/api/d/spotifyv2?url=${encodeURIComponent(spotifyUrl)}`;
+            const apiUrl = `${process.env.ALTERNATIVE_API_URL}/api/d/spotifyv2?url=${encodeURIComponent(spotifyUrl)}`;
             console.log('Spotify Download API URL:', apiUrl);
             const response = await axios.get(apiUrl, {
                 headers: {
