@@ -69,10 +69,11 @@ Para poner en marcha tu propio WBot, sigue estos pasos:
    ```
 
 3. **Configura tus variables de entorno:**
-   Crea un archivo `.env` en la raíz del proyecto y añade tus credenciales de la API:
+      Crea un archivo `.env` en la raíz del proyecto y añade tus credenciales de la API:
    ```
    API_URL=https://api.stellarwa.xyz
    API_KEY=tu_api_key
+   ALTERNATIVE_API_URL=https://api.siputzx.my.id
    ```
 
 4. **Inicia el bot:**
@@ -95,6 +96,13 @@ Este proyecto utiliza las siguientes dependencias principales:
 - `qrcode-terminal`: Para mostrar el código QR de WhatsApp en la terminal.
 - `whatsapp-web.js`: La librería principal para interactuar con WhatsApp Web.
 - Y otras más que puedes encontrar en el archivo `package.json`.
+
+---
+
+## 🟢 GitHub Stats
+
+![byAyes's Stats](https://github-readme-stats.vercel.app/api?username=byAyes&theme=vue-dark&show_icons=true&hide_border=true&count_private=true)
+![byAyes's Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=byAyes&theme=vue-dark&show_icons=true&hide_border=true&layout=compact)
 
 ---
 
