@@ -40,6 +40,7 @@ async function descargarPinterest(url, msg, sock, retries = 3) {
             }
 
             const { dl, title } = result.data;
+            const mediaType = 'image'; // Asumiendo que la API principal devuelve imágenes
 
             await sock.sendMessage(msg.key.remoteJid, { text: `Descargando: *${title}*` }, { edit: statusMsg.key });
 
@@ -64,7 +65,7 @@ async function descargarPinterest(url, msg, sock, retries = 3) {
     for (let i = 0; i < retries; i++) {
         try {
             const normalizedUrl = normalizarUrlPinterest(url);
-            const alternativeApiUrl = `${ALTERNATIVE_API_URL}/api/pinterest?url=${encodeURIComponent(normalizedUrl)}`; // Asumiendo que la API alternativa tiene un endpoint similar
+            const alternativeApiUrl = `${ALTERNATIVE_API_URL}/api/d/pinterest?url=${encodeURIComponent(normalizedUrl)}`; // Asumiendo que la API alternativa tiene un endpoint similar
             console.log('Pinterest API URL (Alternativa):', alternativeApiUrl);
 
             const response = await axios.get(alternativeApiUrl, {
@@ -74,11 +75,13 @@ async function descargarPinterest(url, msg, sock, retries = 3) {
             });
             const result = response.data;
 
-            if (!result.status || !result.data?.dl) {
+            if (!result.status || !result.data?.media_urls || result.data.media_urls.length === 0) {
                 return await sock.sendMessage(msg.key.remoteJid, { text: '❌ No se pudo obtener el enlace de descarga desde la API alternativa.' }, { edit: statusMsg.key });
             }
 
-            const { dl, title } = result.data;
+            const dl = result.data.media_urls[0].url;
+            const title = result.data.title || 'Contenido de Pinterest';
+            const mediaType = result.data.media_urls[0].type === 'video' ? 'video' : 'image';
 
             await sock.sendMessage(msg.key.remoteJid, { text: `Descargando (Alternativa): *${title}*` }, { edit: statusMsg.key });
 
