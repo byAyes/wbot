@@ -6,7 +6,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
-const { manejarSpotify } = require('./multimedia/spotifyHandler');
+const { manejarSpotify, descargarSpotifyDirecto } = require('./multimedia/spotifyHandler');
 const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = require('./multimedia/youtube.js');
 const { descargarPinterest } = require('./multimedia/pinterest.js');
 const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
@@ -69,26 +69,14 @@ async function connectToWhatsApp() {
 
             if (quotedBody.includes('¿Quieres descargar la canción?')) {
                 await sock.sendMessage(msg.key.remoteJid, { react: { text: '⌛', key: msg.key } });
-                const titleMatch = quotedBody.match(/🎵 *Título: * (.*)/);
-                const artistMatch = quotedBody.match(/🎤 *Artista: * (.*)/);
+                const spotifyUrlMatch = quotedBody.match(/(https:\/\/open\.spotify\.com\/track\/[a-zA-Z0-9]+)/);
 
-                if (titleMatch && artistMatch) {
-                    const title = titleMatch[1].trim();
-                    const artist = artistMatch[1].trim();
-                    const searchTerm = `${title} ${artist}`;
-
-                    const statusMsg = await sock.sendMessage(msg.key.remoteJid, { text: `Buscando "${searchTerm}" en YouTube...` }, { quoted: msg });
-
-                    const videoResult = await buscarPrimerVideoAPI(searchTerm);
-
-                    if (videoResult && videoResult.url) {
-                        await descargarAudioAPI(videoResult.url, statusMsg, sock);
-                    } else {
-                        await sock.sendMessage(msg.key.remoteJid, { text: `No se encontraron resultados para "${searchTerm}" en YouTube.` }, { quoted: msg });
-                        await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
-                    }
+                if (spotifyUrlMatch && spotifyUrlMatch[1]) {
+                    const spotifyUrl = spotifyUrlMatch[1];
+                    console.log('DEBUG: Extracted Spotify URL:', spotifyUrl);
+                    await descargarSpotifyDirecto(spotifyUrl, msg, sock);
                 } else {
-                    await sock.sendMessage(msg.key.remoteJid, { text: 'No pude encontrar el título y artista en el mensaje original.' }, { quoted: msg });
+                    await sock.sendMessage(msg.key.remoteJid, { text: 'No pude encontrar el enlace de Spotify en el mensaje original.' }, { quoted: msg });
                     await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
                 }
             }
