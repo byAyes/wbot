@@ -8,7 +8,7 @@ const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const { manejarSpotify, descargarSpotifyDirecto } = require('./multimedia/spotifyHandler');
 const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = require('./multimedia/youtube.js');
-const { descargarPinterest } = require('./multimedia/pinterest.js');
+const { descargarMultimedia } = require('./multimedia/descargar.js');
 const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
 const { spawn } = require('child_process');
 
@@ -58,11 +58,7 @@ async function connectToWhatsApp() {
                 return sock.sendMessage(msg.key.remoteJid, { text: 'Por favor, proporciona un término de búsqueda o una URL.' }, { quoted: msg });
             }
 
-            if (content.includes('pinterest.com')) {
-                await descargarPinterest(content, msg, sock);
-            } else {
-                await manejarBusquedaYouTube(content, msg, sock);
-            }
+            await descargarMultimedia(content, 'video', msg, sock);
         } else if ((bodyLower === 'si' || bodyLower === 'sí') && msg.message.extendedTextMessage?.contextInfo?.quotedMessage) {
             const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
             const quotedBody = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || '';

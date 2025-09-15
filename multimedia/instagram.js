@@ -1,7 +1,5 @@
-const ytdlp = require('yt-dlp-exec');
+const axios = require('axios');
 const fs = require('fs');
-const ffmpeg = require('fluent-ffmpeg');
-const { MessageMedia } = require('whatsapp-web.js');
 const path = require('path');
 
 const downloadDir = path.join(__dirname, '../bot/downloads');
@@ -12,114 +10,73 @@ if (!fs.existsSync(downloadDir)) {
 }
 
 /**
- * Descarga videos o música de Instagram usando yt-dlp, convierte el archivo si es necesario y lo envía al usuario.
+ * Descarga videos de Instagram usando la API y lo envía al usuario.
  * @param {string} url - URL del contenido de Instagram.
- * @param {string} formato - Formato de descarga ('audio' o 'video').
  * @param {object} message - Mensaje original para responder con el archivo.
+ * @param {object} sock - Instancia del socket de Baileys.
  */
-async function descargarDeInstagram(url, formato = 'video', message) {
+async function descargarDeInstagram(url, message, sock) {
     try {
-        console.log(`Descargando ${formato} desde Instagram: ${url}`);
+        await sock.sendMessage(message.key.remoteJid, { text: 'Descargando contenido...' }, { quoted: message });
+        console.log(`Descargando desde Instagram: ${url}`);
 
-        const archivoBase = formato === 'audio' ? 'instagram_audio' : 'instagram_video';
-        const extensionFinal = formato === 'audio' ? '.mp3' : '.mp4';
-        let archivoFinal = path.join(downloadDir, `${archivoBase}${extensionFinal}`);
+        const apiUrl = `${process.env.ALTERNATIVE_API_URL}/api/d/igdl?url=${encodeURIComponent(url)}`;
+        const response = await axios.get(apiUrl);
 
-        // Ejecutar yt-dlp con más registros
-        const outputPattern = path.join(downloadDir, `${archivoBase}.%(ext)s`);
-        await ytdlp(url, {
-            output: outputPattern,
-            format: 'best', // Cambiar a 'best' para mayor compatibilidad
-            verbose: true, // Habilitar registros detallados
-        }).catch((error) => {
-            console.error('Error al ejecutar yt-dlp:', error.message);
-            throw new Error('Error al descargar el contenido con yt-dlp.');
-        });
+        if (response.data && response.data.status === true && response.data.data && response.data.data.length > 0) {
+            const media = response.data.data[0];
+            const mediaUrl = media.url;
+            
+            // Usar el nombre de archivo de la API si está disponible, si no, generar uno.
+            const fileName = media.filename || `instagram_${Date.now()}.mp4`;
+            const filePath = path.join(downloadDir, fileName);
 
-        // Verificar si el archivo descargado existe directamente
-        if (!fs.existsSync(archivoFinal)) {
-            console.error('Archivos disponibles:', fs.readdirSync(downloadDir));
-            throw new Error('No se encontró el archivo descargado.');
-        }
+            const mediaResponse = await axios({
+                url: mediaUrl,
+                method: 'GET',
+                responseType: 'stream'
+            });
 
-        console.log(`Archivo descargado: ${archivoFinal}`);
+            const writer = fs.createWriteStream(filePath);
+            mediaResponse.data.pipe(writer);
 
-        // Convertir a MP3 si es audio
-        if (formato === 'audio') {
             await new Promise((resolve, reject) => {
-                ffmpeg(archivoFinal)
-                    .toFormat('mp3')
-                    .on('end', () => {
-                        console.log('Conversión a MP3 completada.');
-                        resolve();
-                    })
-                    .on('error', (err) => {
-                        console.error('Error al convertir el archivo:', err.message);
-                        reject(err);
-                    })
-                    .save(archivoFinal);
-            });
-        }
-
-        // Convertir a MP4 si es necesario
-        if (formato === 'video') {
-            const archivoConvertido = path.join(downloadDir, `${archivoBase}_convertido${extensionFinal}`);
-            await new Promise((resolve, reject) => {
-                ffmpeg(archivoFinal)
-                    .toFormat('mp4')
-                    .on('end', () => {
-                        console.log('Conversión a MP4 completada.');
-                        resolve();
-                    })
-                    .on('error', (err) => {
-                        console.error('Error al convertir el archivo a MP4:', err.message);
-                        reject(err);
-                    })
-                    .save(archivoConvertido);
+                writer.on('finish', resolve);
+                writer.on('error', reject);
             });
 
-            // Actualizar el archivo final al archivo convertido
-            archivoFinal = archivoConvertido;
-        }
+            console.log(`Enviando video: ${filePath}`);
+            await sock.sendMessage(
+                message.key.remoteJid, 
+                { video: { url: filePath }, caption: '¡Aquí tienes tu video de Instagram!' }, 
+                { quoted: message }
+            );
 
-        // Informar al usuario que el archivo se enviará en unos instantes
-        await message.reply('El archivo se está procesando y será enviado en unos instantes.');
+            // Esperar un poco antes de eliminar para asegurar el envío
+            setTimeout(() => {
+                fs.unlink(filePath, (err) => {
+                    if (err) {
+                        console.error('Error al eliminar el archivo:', err);
+                    } else {
+                        console.log(`Archivo eliminado: ${filePath}`);
+                    }
+                });
+            }, 1000);
 
-        // Leer el archivo final y enviarlo al usuario
-        console.log(`Preparando para enviar el archivo: ${archivoFinal}`);
-
-        let media;
-        try {
-            media = MessageMedia.fromFilePath(archivoFinal);
-            console.log('Objeto MessageMedia creado correctamente.');
-        } catch (error) {
-            console.error('Error al crear el objeto MessageMedia:', error.message);
-            throw new Error('No se pudo preparar el archivo para enviarlo.');
-        }
-
-        try {
-            await message.reply(media);
-            console.log('Archivo enviado correctamente.');
-        } catch (error) {
-            console.error('Error al enviar el archivo:', error.message);
-            console.error('Detalles del archivo:', {
-                path: archivoFinal,
-                size: fs.statSync(archivoFinal).size,
-            });
-            throw new Error('No se pudo enviar el archivo descargado.');
-        }
-
-        // Eliminar el archivo después de enviarlo o en caso de error
-        try {
-            fs.unlinkSync(archivoFinal);
-            console.log('Archivo eliminado correctamente.');
-        } catch (err) {
-            console.error('Error al eliminar el archivo:', err.message);
+        } else {
+            console.log('Respuesta de la API no válida:', response.data);
+            throw new Error('No se pudo obtener el contenido de Instagram o la respuesta de la API no fue la esperada.');
         }
     } catch (error) {
-        console.error('Error al descargar de Instagram:', error.message);
-        message.reply('Hubo un error al intentar descargar el contenido. Por favor, inténtalo de nuevo.');
+        console.error('Error al descargar de Instagram:', error);
+        let errorMessage = 'Hubo un error al intentar descargar el contenido. Por favor, inténtalo de nuevo.';
+        if (error.response) {
+            console.error('Error de la API:', error.response.status, error.response.data);
+            errorMessage = `Error de la API: ${error.response.status}. No se pudo procesar el video.`;
+        }
+        sock.sendMessage(message.key.remoteJid, { text: errorMessage }, { quoted: message });
     }
 }
 
 module.exports = { descargarDeInstagram };
+

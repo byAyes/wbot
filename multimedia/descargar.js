@@ -2,7 +2,7 @@ const ytdlp = require('yt-dlp-exec');
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
-const { MessageMedia } = require('whatsapp-web.js');
+const { descargarDeInstagram } = require('./instagram');
 const axios = require('axios');
 const { exec } = require('child_process');
 
@@ -56,7 +56,11 @@ async function validarURL(url) {
  * @param {string} formato - Formato de descarga ('audio' o 'video').
  * @param {object} message - Mensaje original para responder con el archivo.
  */
-async function descargarMultimedia(url, formato = 'video', message) {
+async function descargarMultimedia(url, formato = 'video', message, sock) {
+    if (url.includes('instagram.com')) {
+        return descargarDeInstagram(url, message, sock);
+    }
+
     try {
         console.log(`Iniciando descarga de ${formato} desde: ${url}`);
 
@@ -172,7 +176,11 @@ async function descargarMultimedia(url, formato = 'video', message) {
         }
 
         try {
-            await message.reply(media);
+            if (formato === 'video') {
+                await sock.sendMessage(message.key.remoteJid, { video: { url: archivoFinal }, caption: 'Aqui tienes tu video' }, { quoted: message });
+            } else {
+                await sock.sendMessage(message.key.remoteJid, { audio: { url: archivoFinal }, mimetype: 'audio/mp4' }, { quoted: message });
+            }
             console.log('Archivo enviado correctamente.');
         } catch (error) {
             console.error('Error al enviar el archivo:', error.message);
@@ -192,7 +200,7 @@ async function descargarMultimedia(url, formato = 'video', message) {
         }
     } catch (error) {
         console.error('Error al descargar multimedia:', error.message);
-        message.reply('Hubo un error al intentar descargar el contenido. Por favor, inténtalo de nuevo.');
+        sock.sendMessage(message.key.remoteJid, { text: 'Hubo un error al intentar descargar el contenido. Por favor, inténtalo de nuevo.' }, { quoted: message });
     }
 }
 
