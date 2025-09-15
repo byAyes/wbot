@@ -4,7 +4,7 @@
 
 [![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow?style=for-the-badge&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Node.js](https://img.shields.io/badge/Environment-Node.js-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
-[![whatsapp-web.js](https://img.shields.io/badge/Library-whatsapp--web.js-brightgreen?style=for-the-badge)](https://wwebjs.dev/)
+[![@whiskeysockets/baileys](https://img.shields.io/badge/Library-%40whiskeysockets%2Fbaileys-brightgreen?style=for-the-badge)](https://github.com/WhiskeySockets/Baileys)
 
 ## ✨ Funcionalidades
 
@@ -90,12 +90,18 @@ Para poner en marcha tu propio WBot, sigue estos pasos:
 
 Este proyecto utiliza las siguientes dependencias principales:
 
+- `@whiskeysockets/baileys`: Conexión con WhatsApp.
 - `axios`: Para realizar peticiones HTTP.
+- `body-parser`: Middleware de Express para analizar cuerpos de solicitudes.
+- `chalk`: Para dar estilo al texto en la terminal.
 - `dotenv`: Para manejar variables de entorno.
 - `express`: Para crear el servidor web.
+- `fluent-ffmpeg`: Para la manipulación de multimedia.
 - `qrcode-terminal`: Para mostrar el código QR de WhatsApp en la terminal.
-- `whatsapp-web.js`: La librería principal para interactuar con WhatsApp Web.
-- Y otras más que puedes encontrar en el archivo `package.json`.
+- `spotify-web-api-node`: Para interactuar con la API de Spotify.
+- `youtube-sr`: Para realizar búsquedas en YouTube.
+- `yt-dlp-exec`: Wrapper para yt-dlp, una herramienta de descarga de videos.
+- `ytdl-core`: Para descargar videos de YouTube.
 
 ---
 
