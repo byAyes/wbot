@@ -1,8 +1,9 @@
-const ytdlp = require('yt-dlp-exec');
+
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
 const { descargarDeInstagram } = require('./instagram');
+const { descargarPinterest } = require('./pinterest');
 const axios = require('axios');
 const { exec } = require('child_process');
 
@@ -60,78 +61,44 @@ async function descargarMultimedia(url, formato = 'video', message, sock) {
     if (url.includes('instagram.com')) {
         return descargarDeInstagram(url, message, sock);
     }
+    if (url.includes('pinterest.com')) {
+        return descargarPinterest(url, message, sock);
+    }
 
     try {
         console.log(`Iniciando descarga de ${formato} desde: ${url}`);
+
+        const esURLValida = await validarURL(url);
+        if (!esURLValida) {
+            return sock.sendMessage(message.key.remoteJid, { text: 'La descarga de videos de YouTube está temporalmente deshabilitada.' }, { quoted: message });
+        }
 
         const archivoBase = formato === 'audio' ? 'media_audio' : 'media_video';
         const extensionFinal = formato === 'audio' ? '.mp3' : '.mp4';
         let archivoFinal = path.join(downloadDir, `${archivoBase}${extensionFinal}`);
 
-        // Validar la URL antes de intentar descargar
-        const esURLValida = await validarURL(url);
-        if (!esURLValida) {
-            console.warn('La URL proporcionada no apunta a un archivo multimedia válido. Intentando con yt-dlp...');
-
-            // Usar yt-dlp si la URL no es válida para descarga directa
-            const outputPattern = path.join(downloadDir, `${archivoBase}.%(ext)s`);
-            await ytdlp(url, {
-                output: outputPattern,
-                format: formato === 'audio' ? 'bestaudio' : 'best',
-                verbose: true,
-            }).catch((error) => {
-                console.error('Error al ejecutar yt-dlp:', error.message);
-                throw new Error('Error al descargar el contenido con yt-dlp.');
+        // Intentar descargar directamente con Axios
+        try {
+            const response = await axios({
+                method: 'GET',
+                url: url,
+                responseType: 'stream',
             });
 
-            // Verificar si el archivo descargado existe
-            if (!fs.existsSync(archivoFinal)) {
-                console.error('Archivos disponibles:', fs.readdirSync(downloadDir));
-                throw new Error('No se encontró el archivo descargado.');
-            }
+            const writer = fs.createWriteStream(archivoFinal);
+            response.data.pipe(writer);
 
-            console.log(`Archivo descargado con yt-dlp: ${archivoFinal}`);
-        } else {
-            // Intentar descargar directamente con Axios
-            try {
-                const response = await axios({
-                    method: 'GET',
-                    url: url,
-                    responseType: 'stream',
-                });
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
 
-                const writer = fs.createWriteStream(archivoFinal);
-                response.data.pipe(writer);
-
-                await new Promise((resolve, reject) => {
-                    writer.on('finish', resolve);
-                    writer.on('error', reject);
-                });
-
-                console.log(`Archivo descargado con Axios: ${archivoFinal}`);
-            } catch (axiosError) {
-                console.warn('Error al descargar con Axios, intentando con yt-dlp:', axiosError.message);
-
-                // Si Axios falla, usar yt-dlp
-                const outputPattern = path.join(downloadDir, `${archivoBase}.%(ext)s`);
-                await ytdlp(url, {
-                    output: outputPattern,
-                    format: formato === 'audio' ? 'bestaudio' : 'best',
-                    verbose: true,
-                }).catch((error) => {
-                    console.error('Error al ejecutar yt-dlp:', error.message);
-                    throw new Error('Error al descargar el contenido.');
-                });
-
-                // Verificar si el archivo descargado existe
-                if (!fs.existsSync(archivoFinal)) {
-                    console.error('Archivos disponibles:', fs.readdirSync(downloadDir));
-                    throw new Error('No se encontró el archivo descargado.');
-                }
-
-                console.log(`Archivo descargado con yt-dlp: ${archivoFinal}`);
-            }
+            console.log(`Archivo descargado con Axios: ${archivoFinal}`);
+        } catch (axiosError) {
+            console.warn('Error al descargar con Axios:', axiosError.message);
+            return sock.sendMessage(message.key.remoteJid, { text: 'La descarga de videos de YouTube está temporalmente deshabilitada.' }, { quoted: message });
         }
+
 
         // Verificar si el archivo descargado es válido
         const esValido = await esArchivoValido(archivoFinal);
