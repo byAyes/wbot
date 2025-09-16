@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const downloadDir = path.join(__dirname, '../bot/downloads');
+const downloadDir = path.join('/tmp', 'downloads');
 
 // Crear la carpeta de descargas si no existe
 if (!fs.existsSync(downloadDir)) {

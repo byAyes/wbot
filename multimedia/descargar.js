@@ -7,7 +7,7 @@ const { descargarPinterest } = require('./pinterest');
 const axios = require('axios');
 const { exec } = require('child_process');
 
-const downloadDir = path.join(__dirname, '../bot/downloads');
+const downloadDir = path.join('/tmp', 'downloads');
 
 // Crear la carpeta de descargas si no existe
 if (!fs.existsSync(downloadDir)) {
