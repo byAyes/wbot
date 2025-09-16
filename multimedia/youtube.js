@@ -1,4 +1,4 @@
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
 const axios = require('axios');
 
 const ALTERNATIVE_API_URL = 'https://api.siputzx.my.id';
