@@ -1,7 +1,6 @@
 require('dotenv').config();
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
+
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const qrcode = require('qrcode-terminal');
@@ -16,6 +15,8 @@ const app = express();
 app.use(bodyParser.json());
 
 async function connectToWhatsApp() {
+    const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = await import('@whiskeysockets/baileys');
+    const { Boom } = await import('@hapi/boom');
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     const sock = makeWASocket({
         auth: state,
