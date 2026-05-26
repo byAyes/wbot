@@ -153,6 +153,11 @@ const commands = [
       sub.setName('recent')
         .setDescription('Últimas entradas en el Hall of Shame')),
 
+  // --- Invite ---
+  new SlashCommandBuilder()
+    .setName('invite')
+    .setDescription('🔗 Envía el enlace de invitación para agregar el bot a otros servidores'),
+
   // --- Utility ---
   new SlashCommandBuilder()
     .setName('ping')

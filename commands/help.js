@@ -42,12 +42,12 @@ module.exports = {
         {
           name: '🎂 Utilidades',
           value:
-            '`/birthday set <DD-MM-YYYY>` - Guarda tu cumpleaños\n' +
-            '`/birthday list` - Muestra próximos cumpleaños\n' +
-            '`/birthday get` - Muestra tu cumpleaños\n' +
-            '`/birthday delete` - Elimina tu cumpleaños\n' +
-            '`/ping` - Muestra la latencia del bot\n' +
-            '`/reload [comando]` - 🔄 Recarga comandos sin reiniciar (Owner)',
+            '`/birthday set <DD-MM-YYYY>` - Guarda tu cumpleaños\n' +                            '`/birthday list` - Muestra próximos cumpleaños\n' +
+                            '`/birthday get` - Muestra tu cumpleaños\n' +
+                            '`/birthday delete` - Elimina tu cumpleaños\n' +
+                            '`/invite` - 🔗 Invitar el bot a otros servidores\n' +
+                            '`/ping` - Muestra la latencia del bot\n' +
+                            '`/reload [comando]` - 🔄 Recarga comandos sin reiniciar (Owner)',
           inline: false,
         },
         {
