@@ -1,105 +1,117 @@
 require('dotenv').config();
-const makeWASocket = require('@whiskeysockets/baileys').default;
-const { useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const express = require('express');
-const bodyParser = require('body-parser');
-const qrcode = require('qrcode-terminal');
-const pino = require('pino');
-const { manejarSpotify, descargarSpotifyDirecto } = require('./multimedia/spotifyHandler');
-const { manejarBusquedaYouTube, buscarPrimerVideoAPI, descargarAudioAPI } = require('./multimedia/youtube.js');
-const { descargarMultimedia } = require('./multimedia/descargar.js');
-const { guardarCumpleaños, mostrarCumpleaños } = require('./bot/cumpleaños.js');
-const { spawn } = require('child_process');
+const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const logger = require('./utils/logger');
+const { initPlayer } = require('./music/player');
 
-const app = express();
-app.use(bodyParser.json());
+// --- Client Setup ---
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates,
+  ],
+});
 
-async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-    const sock = makeWASocket({
-        auth: state,
-        logger: pino({ level: 'silent' })
-    });
+client.commands = new Collection();
 
-    sock.ev.on('creds.update', saveCreds);
+// --- Load Commands ---
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if(qr) {
-            qrcode.generate(qr, {small: true});
-        }
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            // reconnect if not logged out
-            if (shouldReconnect) {
-                connectToWhatsApp();
-            }
-        } else if (connection === 'open') {
-            console.log('opened connection');
-        }
-    });
-
-    sock.ev.on('messages.upsert', async (m) => {
-        const msg = m.messages[0];
-        if (!msg.message) return;
-
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-        const bodyLower = body.toLowerCase().trim();
-
-        const isPlayCommand = bodyLower.startsWith('.p ') || bodyLower.startsWith('.play ') || bodyLower.startsWith('.d ') || bodyLower.startsWith('.descargar ');
-
-        if (isPlayCommand) {
-            const command = body.split(' ')[0];
-            const content = body.substring(command.length).trim();
-
-            if (!content) {
-                return sock.sendMessage(msg.key.remoteJid, { text: 'Por favor, proporciona un término de búsqueda o una URL.' }, { quoted: msg });
-            }
-
-            await descargarMultimedia(content, 'video', msg, sock);
-        } else if ((bodyLower === 'si' || bodyLower === 'sí') && msg.message.extendedTextMessage?.contextInfo?.quotedMessage) {
-            const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
-            const quotedBody = quotedMsg.conversation || quotedMsg.extendedTextMessage?.text || '';
-
-            if (quotedBody.includes('¿Quieres descargar la canción?')) {
-                await sock.sendMessage(msg.key.remoteJid, { react: { text: '⌛', key: msg.key } });
-                const spotifyUrlMatch = quotedBody.match(/(https:\/\/open\.spotify\.com\/track\/[a-zA-Z0-9]+)/);
-
-                if (spotifyUrlMatch && spotifyUrlMatch[1]) {
-                    const spotifyUrl = spotifyUrlMatch[1];
-                    console.log('DEBUG: Extracted Spotify URL:', spotifyUrl);
-                    await descargarSpotifyDirecto(spotifyUrl, msg, sock);
-                } else {
-                    await sock.sendMessage(msg.key.remoteJid, { text: 'No pude encontrar el enlace de Spotify en el mensaje original.' }, { quoted: msg });
-                    await sock.sendMessage(msg.key.remoteJid, { react: { text: '❌', key: msg.key } });
-                }
-            }
-        } else if (bodyLower.startsWith('.spotify') || bodyLower.startsWith('.s') || bodyLower.startsWith('.sp')) {
-            const command = body.split(' ')[0];
-            const query = body.substring(command.length).trim();
-            await manejarSpotify(query, msg, sock);
-        } else if (bodyLower.startsWith('.bd')) {
-            await guardarCumpleaños(msg, sock);
-        } else if (bodyLower === '.cumpleaños') {
-            await mostrarCumpleaños(msg, sock);
-        } else if (bodyLower === '.reset') {
-            console.log('Reiniciando el bot...');
-            await sock.sendMessage(msg.key.remoteJid, { text: 'Reiniciando...' });
-            const child = spawn(process.argv[0], process.argv.slice(1), {
-                detached: true,
-                stdio: 'inherit'
-            });
-            child.unref();
-            process.exit();
-        }
-    });
+for (const file of commandFiles) {
+  const filePath = path.join(commandsPath, file);
+  const command = require(filePath);
+  if ('data' in command && 'execute' in command) {
+    client.commands.set(command.data.name, command);
+    logger.info(`Loaded command: /${command.data.name}`);
+  } else {
+    logger.warn(`Command ${file} is missing required "data" or "execute" property.`);
+  }
 }
 
-connectToWhatsApp();
+// --- Load Events ---
+const eventsPath = path.join(__dirname, 'events');
+if (fs.existsSync(eventsPath)) {
+  const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🟢 Servidor escuchando en el puerto ${PORT} 🟢`);
+  for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+    if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+      client.on(event.name, (...args) => event.execute(...args, client));
+    }
+    logger.info(`Loaded event: ${event.name}`);
+  }
+}
+
+// --- Ready Event ---
+client.once(Events.ClientReady, async (c) => {
+  logger.divider();
+  logger.startup('NAUTILUS DISCORD BOT');
+  logger.success(`Conectado como: ${c.user.tag}`);
+  logger.info(`Servidores: ${c.guilds.cache.size}`);
+  logger.info(`Comandos: ${client.commands.size}`);
+
+  // Initialize music player
+  try {
+    await initPlayer(client);
+    logger.success('Sistema de música inicializado correctamente');
+  } catch (error) {
+    logger.error('Error al inicializar sistema de música:', error.message);
+  }
+
+  logger.divider();
 });
+
+// --- Interaction Create Event ---
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    logger.command(
+      interaction.commandName,
+      interaction.user.id,
+      interaction.user.tag,
+    );
+    await command.execute(interaction);
+  } catch (error) {
+    logger.error(`Error executing /${interaction.commandName}:`, error);
+
+    const reply = { content: '❌ Ocurrió un error al ejecutar el comando. Por favor, inténtalo de nuevo.', ephemeral: true };
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp(reply).catch(() => {});
+    } else {
+      await interaction.reply(reply).catch(() => {});
+    }
+  }
+});
+
+// --- Error Handling ---
+process.on('unhandledRejection', (error) => {
+  logger.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception:', error);
+});
+
+// --- Login ---
+const token = process.env.DISCORD_TOKEN;
+if (!token) {
+  logger.error('DISCORD_TOKEN no está configurado en el archivo .env');
+  process.exit(1);
+}
+
+client.login(token);
+
+module.exports = client;

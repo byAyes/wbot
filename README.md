@@ -1,117 +1,199 @@
-# cBotWA - Tu Asistente de WhatsApp
-
-¡Bienvenido a WBot, tu asistente personal para WhatsApp! Este bot te permite descargar contenido multimedia de varias plataformas directamente en tus chats.
+# 🐚 Nautilus - Discord Bot
 
 [![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow?style=for-the-badge&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Node.js](https://img.shields.io/badge/Environment-Node.js-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
-[![@whiskeysockets/baileys](https://img.shields.io/badge/Library-%40whiskeysockets%2Fbaileys-brightgreen?style=for-the-badge)](https://github.com/WhiskeySockets/Baileys)
+[![discord.js](https://img.shields.io/badge/Library-discord.js-5865F2?style=for-the-badge&logo=discord)](https://discord.js.org/)
+[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite)](https://www.sqlite.org/)
 
-## ✨ Funcionalidades
-
-cBotWA ofrece una variedad de funciones para enriquecer tu experiencia en WhatsApp:
-
-- **Descarga de YouTube:** Busca y descarga videos o audios de YouTube.
-- **Descarga de Pinterest:** Descarga videos e imágenes desde enlaces de Pinterest.
-- **Búsqueda en Spotify:** Busca información de canciones en Spotify y te ofrece la opción de descargarlas.
+> **Nautilus** es un bot de Discord todo-en-uno para descargar contenido multimedia de YouTube, Spotify, Instagram y Pinterest, además de utilidades como registro de cumpleaños.
 
 ---
 
-## 🚀 Comandos
+## ✨ Funcionalidades
 
-A continuación se detallan los comandos disponibles y cómo usarlos:
+| Comando | Descripción |
+|---------|-------------|
+| `/play <query> [formato]` | Busca y descarga audio/video de YouTube |
+| `/spotify <query>` | Busca información y descarga canciones de Spotify |
+| `/pinterest <url>` | Descarga imágenes/videos de Pinterest |
+| `/instagram <url>` | Descarga videos y reels de Instagram |
+| `/download <url> [formato]` | Descarga desde enlaces directos con yt-dlp |
+| `/birthday set <DD-MM-YYYY>` | Guarda tu fecha de cumpleaños |
+| `/birthday list` | Muestra los próximos cumpleaños |
+| `/birthday get` | Muestra tu cumpleaños guardado |
+| `/birthday delete` | Elimina tu cumpleaños |
+| `/ping` | Muestra la latencia del bot |
+| `/help` | Muestra todos los comandos disponibles |
 
-### `.p`, `.play`, `.d`, `.descargar`
+---
 
-Este comando es tu navaja suiza para descargar contenido. Puedes usarlo con un término de búsqueda para YouTube o con un enlace de Pinterest.
+## 🚀 Requisitos
 
-**Uso:**
-- `.p <nombre de la canción o video>`
-- `.play <nombre de la canción o video>`
-- `.d <URL de Pinterest>`
-- `.descargar <URL de Pinterest>`
-
-**Ejemplos:**
-- `.p Imagine Dragons - Believer`
-- `.d https://pin.it/1a2b3c4d`
-
-Al buscar en YouTube, el bot te preguntará si deseas descargar el contenido como **audio** o **video**.
-
-### `.spotify`, `.s`, `.sp`
-
-Usa este comando para buscar información sobre una canción en Spotify.
-
-**Uso:**
-- `.spotify <nombre de la canción>`
-- `.s <nombre de la canción>`
-- `.sp <nombre de la canción>`
-
-**Ejemplo:**
-- `.spotify Queen - Bohemian Rhapsody`
-
-El bot te mostrará la información de la canción y te preguntará si deseas descargarla. Si respondes `si`, el bot buscará la canción en YouTube y la descargará por ti.
+- **Node.js** v18 o superior
+- **Python** 3.x (para yt-dlp-exec, opcional)
+- **ffmpeg** (para conversión de audio/video, opcional)
+- Un **bot de Discord** registrado en el [Developer Portal](https://discord.com/developers/applications)
 
 ---
 
 ## 🔧 Instalación
 
-Para poner en marcha tu propio WBot, sigue estos pasos:
+### 1. Clona el repositorio
 
-1. **Clona el repositorio:**
-   ```bash
-   git clone https://github.com/tu-usuario/wbot.git
-   cd wbot
-   ```
+```bash
+git clone https://github.com/tu-usuario/nautilus.git
+cd nautilus
+```
 
-2. **Instala las dependencias:**
-   Asegúrate de tener [Node.js](https://nodejs.org/) instalado. Luego, ejecuta:
-   ```bash
-   npm install
-   ```
+### 2. Instala las dependencias
 
-3. **Configura tus variables de entorno:**
-      Crea un archivo `.env` en la raíz del proyecto y añade tus credenciales de la API:
-   ```
-   API_URL=https://api.stellarwa.xyz
-   API_KEY=tu_api_key
-   ALTERNATIVE_API_URL=https://api.siputzx.my.id
-   ```
+```bash
+npm install
+```
 
-4. **Inicia el bot:**
-   ```bash
-   node index.js
-   ```
+> **Nota:** Si usas Windows y tienes problemas con `yt-dlp-exec`, instala Python desde [python.org](https://python.org) o ejecuta:
+> ```bash
+> npm install --ignore-scripts
+> ```
 
-5. **Escanea el código QR:**
-   Abre WhatsApp en tu teléfono y escanea el código QR que aparece en la terminal.
+### 3. Configura las variables de entorno
+
+Crea un archivo `.env` en la raíz:
+
+```env
+# === Discord Configuration ===
+DISCORD_TOKEN=tu_token_de_discord_aqui
+CLIENT_ID=tu_client_id_de_discord_aqui
+
+# === External APIs (multimedia downloads) ===
+API_URL=https://api.stellarwa.xyz
+API_KEY=tu_api_key_aqui
+ALTERNATIVE_API_URL=https://api.siputzx.my.id
+
+# === Optional ===
+LOG_LEVEL=INFO
+```
+
+### 4. Registra los comandos slash
+
+```bash
+node deploy-commands.js
+```
+
+### 5. Inicia el bot
+
+```bash
+npm start
+```
 
 ---
 
-## 📦 Dependencias
+## ☁️ Deploy en Railway / Render
 
-Este proyecto utiliza las siguientes dependencias principales:
+### Railway
 
-- `@whiskeysockets/baileys`: Conexión con WhatsApp.
-- `axios`: Para realizar peticiones HTTP.
-- `body-parser`: Middleware de Express para analizar cuerpos de solicitudes.
-- `chalk`: Para dar estilo al texto en la terminal.
-- `dotenv`: Para manejar variables de entorno.
-- `express`: Para crear el servidor web.
-- `fluent-ffmpeg`: Para la manipulación de multimedia.
-- `qrcode-terminal`: Para mostrar el código QR de WhatsApp en la terminal.
-- `spotify-web-api-node`: Para interactuar con la API de Spotify.
-- `youtube-sr`: Para realizar búsquedas en YouTube.
-- `yt-dlp-exec`: Wrapper para yt-dlp, una herramienta de descarga de videos.
-- `ytdl-core`: Para descargar videos de YouTube.
+1. Crea una cuenta en [Railway](https://railway.app)
+2. Conecta tu repositorio de GitHub
+3. Railway detectará automáticamente el `Dockerfile`
+4. Configura las variables de entorno en Railway Dashboard
+5. ¡Despliega!
+
+### Render
+
+1. Crea una cuenta en [Render](https://render.com)
+2. Selecciona **New Web Service** → conecta tu repositorio
+3. Configura:
+   - **Runtime:** Docker
+   - **Build Command:** (dejarlo vacío, usa el Dockerfile)
+   - **Start Command:** (dejarlo vacío)
+4. Agrega las variables de entorno
+5. Despliega
+
+> ⚠️ **Importante:** Después del deploy, ejecuta `node deploy-commands.js` localmente (o mediante un script en el panel) para registrar los comandos slash en Discord.
 
 ---
 
-## 🟢 GitHub Stats
+## 🗄️ Base de Datos
 
-![byAyes's Stats](https://github-readme-stats.vercel.app/api?username=byAyes&theme=vue-dark&show_icons=true&hide_border=true&count_private=true)
-![byAyes's Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=byAyes&theme=vue-dark&show_icons=true&hide_border=true&layout=compact)
+Nautilus usa **SQLite** para almacenar los cumpleaños (migración automática desde el antiguo formato JSON).
+
+- Archivo: `data/nautilus.db`
+- Se crea automáticamente al ejecutar el bot
+
+---
+
+## 🔌 APIs Externas
+
+El bot usa APIs externas para las descargas multimedia:
+
+| Servicio | APIs utilizadas |
+|----------|----------------|
+| YouTube | `API_URL` + `ALTERNATIVE_API_URL` |
+| Spotify | `API_URL` (búsqueda) + `ALTERNATIVE_API_URL` (descarga) |
+| Pinterest | `API_URL` + `ALTERNATIVE_API_URL` |
+| Instagram | `ALTERNATIVE_API_URL` |
+| General | yt-dlp + ffmpeg (locales) |
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+nautilus/
+├── commands/          # Comandos slash
+│   ├── youtube.js     # /play
+│   ├── spotify.js     # /spotify
+│   ├── pinterest.js   # /pinterest
+│   ├── instagram.js   # /instagram
+│   ├── download.js    # /download
+│   ├── birthday.js    # /birthday
+│   ├── utility.js     # /ping
+│   └── help.js        # /help
+├── database/          # Capa de persistencia
+│   └── setup.js       # SQLite + CRUD
+├── utils/             # Utilidades
+│   ├── api.js         # Helpers de APIs con retry
+│   └── logger.js      # Logging con colores
+├── data/              # Datos runtime (DB, descargas)
+├── index.js           # Entry point
+├── deploy-commands.js # Registro de comandos
+├── Dockerfile         # Contenedor Docker
+└── package.json
+```
+
+---
+
+## 🐳 Docker
+
+```bash
+# Build
+docker build -t nautilus-bot .
+
+# Run
+docker run -d \
+  --name nautilus \
+  --env-file .env \
+  -v nautilus-data:/usr/src/app/data \
+  nautilus-bot
+```
+
+---
+
+## 🧪 Comandos de Desarrollo
+
+```bash
+# Verificar sintaxis de todos los archivos
+node --check index.js && node --check commands/*.js
+
+# Registrar comandos slash
+node deploy-commands.js
+
+# Iniciar en modo desarrollo
+node index.js
+```
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia ISC. Consulta el archivo `LICENSE` para más detalles.
+ISC
