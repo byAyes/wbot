@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const ytdlp = require('yt-dlp-exec');
 const fs = require('fs');
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
@@ -66,38 +65,16 @@ module.exports = {
       const archivoBase = `media_${Date.now()}`;
       const extensionFinal = formato === 'audio' ? '.mp3' : '.mp4';
       let archivoFinal = path.join(downloadDir, `${archivoBase}${extensionFinal}`);
-      let downloaded = false;
 
-      // Try direct download with Axios first
+      // Download via Axios (works for direct media URLs)
       try {
-        await interaction.editReply({ content: '⏳ Intentando descarga directa...' });
+        await interaction.editReply({ content: '⏳ Descargando...' });
         await descargarConAxios(url, archivoFinal);
-        downloaded = true;
-        logger.info('Downloaded with Axios directly');
       } catch (axiosError) {
-        logger.warn('Axios direct download failed, trying yt-dlp:', axiosError.message);
-        try {
-          await interaction.editReply({ content: '⏳ Usando yt-dlp para descargar...' });
-          const outputPattern = path.join(downloadDir, `${archivoBase}.%(ext)s`);
-          await ytdlp(url, {
-            output: outputPattern,
-            format: formato === 'audio' ? 'bestaudio' : 'best',
-          });
-
-          // Find the downloaded file (extension may vary)
-          const files = fs.readdirSync(downloadDir).filter(f => f.startsWith(archivoBase));
-          if (files.length > 0) {
-            archivoFinal = path.join(downloadDir, files[0]);
-            downloaded = true;
-          } else {
-            throw new Error('No se encontró el archivo descargado.');
-          }
-        } catch (ytdlpError) {
-          throw new Error(`No se pudo descargar: ${axiosError.message} | ${ytdlpError.message}`);
-        }
+        throw new Error(`No se pudo descargar: ${axiosError.message}`);
       }
 
-      if (!downloaded || !fs.existsSync(archivoFinal)) {
+      if (!fs.existsSync(archivoFinal)) {
         return await interaction.editReply({ content: '❌ No se pudo descargar el archivo.' });
       }
 
