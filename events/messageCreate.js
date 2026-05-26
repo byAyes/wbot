@@ -77,19 +77,6 @@ module.exports = {
       return;
     }
 
-    // Don't allow self-nomination
-    if (quotedMessage.author.id === message.author.id) {
-      try {
-        await message.react('🙅');
-        const reply = await message.reply({
-          content: '🙅 No puedes nominarte a ti mismo al Hall of Shame.',
-          allowedMentions: { repliedUser: false },
-        });
-        setTimeout(() => reply.delete().catch(() => {}), 5000);
-      } catch {}
-      return;
-    }
-
     // Check for duplicates
     if (isAlreadyInHallOfShame(quotedMessage.id)) {
       try {
