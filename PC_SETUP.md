@@ -1,4 +1,4 @@
-# 🖥️ Ejecutar Nautilus Bot en tu PC (Gratis)
+# 🖥️ Ejecutar Carlos Bot en tu PC (Gratis)
 
 Guía para correr el bot 24/7 en tu propia computadora con **PM2**, sin pagar hosting.
 
@@ -121,9 +121,9 @@ Si todo funciona, verás algo como:
 
 ```
 ╔══════════════════════════════════════╗
-║         NAUTILUS DISCORD BOT         ║
+║         CARLOS DISCORD BOT           ║
 ╚══════════════════════════════════════╝
-✅ Conectado como: Nautilus#1234
+✅ Conectado como: Carlos#1234
 ℹ️ Servidores: 5
 ℹ️ Comandos: 11
 ✅ Sistema de música inicializado correctamente

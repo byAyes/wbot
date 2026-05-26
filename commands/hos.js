@@ -119,7 +119,7 @@ module.exports = {
 
       if (!stats || stats.length === 0) {
         return interaction.reply({
-          content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Nautilus** para hacerlo.',
+          content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Carlos** para hacerlo.',
           ephemeral: true,
         });
       }
@@ -145,7 +145,7 @@ module.exports = {
 
       if (!entries || entries.length === 0) {
         return interaction.reply({
-          content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Nautilus** para hacerlo.',
+          content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Carlos** para hacerlo.',
           ephemeral: true,
         });
       }

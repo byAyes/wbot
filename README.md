@@ -1,11 +1,11 @@
-# 🐚 Nautilus - Discord Bot
+# 🐚 Carlos - Discord Bot
 
 [![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow?style=for-the-badge&logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Node.js](https://img.shields.io/badge/Environment-Node.js-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 [![discord.js](https://img.shields.io/badge/Library-discord.js-5865F2?style=for-the-badge&logo=discord)](https://discord.js.org/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite)](https://www.sqlite.org/)
 
-> **Nautilus** es un bot de Discord todo-en-uno para descargar contenido multimedia de YouTube, Spotify, Instagram y Pinterest, además de utilidades como registro de cumpleaños.
+> **Carlos** es un bot de Discord todo-en-uno para descargar contenido multimedia de YouTube, Spotify, Instagram y Pinterest, además de utilidades como registro de cumpleaños.
 
 ---
 
@@ -115,7 +115,7 @@ npm start
 
 ## 🗄️ Base de Datos
 
-Nautilus usa **SQLite** para almacenar los cumpleaños (migración automática desde el antiguo formato JSON).
+Carlos usa **SQLite** para almacenar los cumpleaños (migración automática desde el antiguo formato JSON).
 
 - Archivo: `data/nautilus.db`
 - Se crea automáticamente al ejecutar el bot

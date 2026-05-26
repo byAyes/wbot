@@ -8,7 +8,7 @@ module.exports = {
   async execute(interaction) {
     const embed = new EmbedBuilder()
       .setColor(0x5865F2)
-      .setTitle('📚 Comandos de Nautilus')
+      .setTitle('📚 Comandos de Carlos')
       .setDescription('Bot multimedia con descargas y utilidades')
       .addFields(
         {
@@ -53,7 +53,7 @@ module.exports = {
         {
           name: '🏆 Hall of Shame',
           value:
-            'Responde a un mensaje **mencionando a @Nautilus** para\n' +
+            'Responde a un mensaje **mencionando a @Carlos** para\n' +
             'enviarlo al Hall of Shame. Se genera una imagen del\n' +
             'mensaje y se publica en el canal configurado 🏆🔥💀\n' +
             '`/hos setup` - Configurar canal y rol (Admin)\n' +
@@ -63,7 +63,7 @@ module.exports = {
           inline: false,
         },
       )
-      .setFooter({ text: 'Nautilus v2.0 | Desarrollado con discord.js' })
+      .setFooter({ text: 'Carlos v2.0 | Desarrollado con discord.js' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });

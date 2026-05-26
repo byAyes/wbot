@@ -13,9 +13,9 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0x5865F2)
-      .setTitle('🔗 Invita a Nautilus')
+      .setTitle('🔗 Invita a Carlos')
       .setDescription(
-        '¡Agrega **Nautilus** a tu servidor y disfruta de:\n\n' +
+        '¡Agrega **Carlos** a tu servidor y disfruta de:\n\n' +
         '🎵 Descarga música y videos de YouTube, Spotify\n' +
         '🖼️ Descarga de Instagram, Pinterest\n' +
         '🏆 Sistema de Hall of Shame\n' +
@@ -29,7 +29,7 @@ module.exports = {
     const row = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
-          .setLabel('➕ Invitar Nautilus')
+          .setLabel('➕ Invitar Carlos')
           .setStyle(ButtonStyle.Link)
           .setURL(inviteUrl),
         new ButtonBuilder()

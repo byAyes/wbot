@@ -1,4 +1,4 @@
-# ☁️ Google Cloud — Hostear Nautilus Bot (Gratis)
+# ☁️ Google Cloud — Hostear Carlos Bot (Gratis)
 
 Guía para correr el bot 24/7 en una VM **e2-micro** de Google Cloud, totalmente gratis para siempre.
 
@@ -151,9 +151,9 @@ Si ves algo como:
 
 ```
 ╔══════════════════════════════════════╗
-║         NAUTILUS DISCORD BOT         ║
+║         CARLOS DISCORD BOT           ║
 ╚══════════════════════════════════════╝
-✅ Conectado como: Nautilus#1234
+✅ Conectado como: Carlos#1234
 ```
 
 **¡Funciona!** Presiona **Ctrl + C** para detenerlo.

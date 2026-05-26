@@ -1,4 +1,4 @@
-# ☁️ Deploy Nautilus en Oracle Cloud "Always Free"
+# ☁️ Deploy Carlos en Oracle Cloud "Always Free"
 
 ## 1. Crear cuenta en Oracle Cloud
 
@@ -124,7 +124,7 @@ Pega esto:
 
 ```ini
 [Unit]
-Description=Nautilus Discord Bot
+Description=Carlos Discord Bot
 After=network.target
 
 [Service]
