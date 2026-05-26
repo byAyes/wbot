@@ -1,4 +1,4 @@
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,8 +14,8 @@ let db;
 
 function getDatabase() {
   if (!db) {
-    db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
+    db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA journal_mode = WAL');
     initTables();
   }
   return db;
@@ -153,8 +153,9 @@ function migrateFromJson() {
           VALUES (?, ?, ?, ?, ?, ?)
         `);
 
-        const migrate = db.transaction((entries) => {
-          for (const entry of entries) {
+        db.exec('BEGIN TRANSACTION');
+        try {
+          for (const entry of data) {
             const parts = entry.birthday.split('-');
             if (parts.length === 3) {
               insert.run(
@@ -167,9 +168,12 @@ function migrateFromJson() {
               );
             }
           }
-        });
+          db.exec('COMMIT');
+        } catch (txErr) {
+          db.exec('ROLLBACK');
+          throw txErr;
+        }
 
-        migrate(data);
         console.log(`Migrated ${data.length} birthdays from birthdays.json`);
       }
     } catch (err) {

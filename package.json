@@ -24,11 +24,10 @@
     "@discordjs/voice": "^0.19.2",
     "@distube/yt-dlp": "^2.0.1",
     "@napi-rs/canvas": "^1.0.0",
-    "axios": "^1.11.0",
-    "better-sqlite3": "^11.0.0",
+    "axios": "^1.16.1",
     "chalk": "^5.6.2",
     "discord-player": "^7.2.0",
-    "discord.js": "^14.18.0",
+    "discord.js": "^14.26.4",
     "dotenv": "^17.2.2",
     "ffmpeg-static": "^5.3.0",
     "fluent-ffmpeg": "^2.1.3"
