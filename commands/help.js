@@ -29,14 +29,19 @@ module.exports = {
         {
           name: '🎵 Música en Voz',
           value:
-            '`/music play <query>` - Reproduce música en canal de voz\n' +
-            '`/music skip` - Salta a la siguiente canción\n' +
-            '`/music stop` - Detiene la música y sale del canal\n' +
-            '`/music queue` - Muestra la cola de reproducción\n' +
-            '`/music nowplaying` - Muestra la canción actual\n' +
-            '`/music pause` - Pausa la reproducción\n' +
-            '`/music resume` - Reanuda la reproducción\n' +
-            '`/music volume <1-100>` - Ajusta el volumen',
+            '`/music play <query>` - Reproduce música (YT/Spotify/SC)\n' +
+            '`/music skip` / `stop` / `pause` / `resume`\n' +
+            '`/music nowplaying` - Canción actual\n' +
+            '`/music queue` - Cola de reproducción\n' +
+            '`/music volume <1-100>` - Volumen\n' +
+            '`/music shuffle` - Modo aleatorio\n' +
+            '`/music loop <off/track/queue/autoplay>`\n' +
+            '`/music remove <#>` - Quitar canción de la cola\n' +
+            '`/music move <desde> <hasta>` - Reordenar\n' +
+            '`/music seek <segundos>` - Adelantar/retroceder\n' +
+            '`/music lyrics` - Letra de la canción actual\n' +
+            '`/music filters <filtro>` - Efectos de audio (18)\n' +
+            '`/music clear` - Limpiar la cola',
           inline: false,
         },
         {
