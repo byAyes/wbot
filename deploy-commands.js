@@ -3,13 +3,13 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const logger = require('./utils/logger');
 
 const commands = [
-  // --- YouTube ---
+  // --- Play (YouTube, SoundCloud, Spotify) ---
   new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Busca y descarga audio/video de YouTube')
+    .setDescription('Busca y descarga música/video de YouTube, SoundCloud y Spotify')
     .addStringOption(option =>
       option.setName('query')
-        .setDescription('Nombre de la canción/video o URL de YouTube')
+        .setDescription('Nombre de la canción/video o URL (YouTube, Spotify, SoundCloud)')
         .setRequired(true))
     .addStringOption(option =>
       option.setName('formato')
@@ -18,6 +18,14 @@ const commands = [
         .addChoices(
           { name: 'Audio (MP3)', value: 'audio' },
           { name: 'Video (MP4)', value: 'video' },
+        ))
+    .addStringOption(option =>
+      option.setName('fuente')
+        .setDescription('Fuente de búsqueda (se auto-detecta si es una URL)')
+        .setRequired(false)
+        .addChoices(
+          { name: 'YouTube', value: 'youtube' },
+          { name: 'SoundCloud', value: 'soundcloud' },
         )),
 
   // --- Spotify ---
@@ -161,9 +169,7 @@ const commands = [
   // --- Utility ---
   new SlashCommandBuilder()
     .setName('ping')
-    .setDescription('Muestra la latencia del bot'),
-
-  new SlashCommandBuilder()
+    .setDescription('Muestra la latencia del bot'),      new SlashCommandBuilder()
     .setName('help')
     .setDescription('Muestra la lista de comandos disponibles'),
 

@@ -14,8 +14,8 @@ module.exports = {
         {
           name: '🎵 Música y Video',
           value:
-            '`/play <query> [formato]` - Busca y descarga de YouTube\n' +
-            '`/spotify <query>` - Busca y descarga de Spotify\n' +
+            '`/play <query> [formato] [fuente]` - Descarga de\n' +
+            '  YouTube, SoundCloud o Spotify (pega la URL)\n' +
             '`/download <url> [formato]` - Descarga desde enlace directo',
           inline: false,
         },
@@ -42,12 +42,13 @@ module.exports = {
         {
           name: '🎂 Utilidades',
           value:
-            '`/birthday set <DD-MM-YYYY>` - Guarda tu cumpleaños\n' +                            '`/birthday list` - Muestra próximos cumpleaños\n' +
-                            '`/birthday get` - Muestra tu cumpleaños\n' +
-                            '`/birthday delete` - Elimina tu cumpleaños\n' +
-                            '`/invite` - 🔗 Invitar el bot a otros servidores\n' +
-                            '`/ping` - Muestra la latencia del bot\n' +
-                            '`/reload [comando]` - 🔄 Recarga comandos sin reiniciar (Owner)',
+            '`/birthday set <DD-MM-YYYY>` - Guarda tu cumpleaños\n' +
+            '`/birthday list` - Muestra próximos cumpleaños\n' +
+            '`/birthday get` - Muestra tu cumpleaños\n' +
+            '`/birthday delete` - Elimina tu cumpleaños\n' +
+            '`/invite` - 🔗 Invitar el bot a otros servidores\n' +
+            '`/ping` - Muestra la latencia del bot\n' +
+            '`/reload [comando]` - 🔄 Recarga comandos sin reiniciar (Owner)',
           inline: false,
         },
         {
