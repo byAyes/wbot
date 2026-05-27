@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { setBirthday, getUpcomingBirthdays, getBirthdayByUserId, deleteBirthday } = require('../database/setup');
 const logger = require('../utils/logger');
 
@@ -45,7 +45,7 @@ module.exports = {
       case 'delete':
         return handleDelete(interaction);
       default:
-        return interaction.reply({ content: '❌ Subcomando no válido.', ephemeral: true });
+        return interaction.reply({ content: '❌ Subcomando no válido.', flags: MessageFlags.Ephemeral });
     }
   },
 };
@@ -57,7 +57,7 @@ async function handleSet(interaction) {
   if (dateParts.length !== 3) {
     return interaction.reply({
       content: '❌ Formato incorrecto. Usa: DD-MM-YYYY (ejemplo: 22-11-2004)',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -68,19 +68,17 @@ async function handleSet(interaction) {
   if (isNaN(day) || isNaN(month) || isNaN(year)) {
     return interaction.reply({
       content: '❌ La fecha contiene caracteres no válidos. Usa: DD-MM-YYYY',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
-  }
-
-  if (month < 1 || month > 12) {
-    return interaction.reply({ content: '❌ El mes debe estar entre 1 y 12.', ephemeral: true });
-  }
+  }    if (month < 1 || month > 12) {
+      return interaction.reply({ content: '❌ El mes debe estar entre 1 y 12.', flags: MessageFlags.Ephemeral });
+    }
 
   const daysInMonth = new Date(year, month, 0).getDate();
   if (day < 1 || day > daysInMonth) {
     return interaction.reply({
       content: `❌ El día debe estar entre 1 y ${daysInMonth} para el mes ${getMonthName(month)}.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -106,7 +104,7 @@ async function handleSet(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     logger.error('Error saving birthday:', error);
-    await interaction.reply({ content: '❌ Error al guardar tu cumpleaños.', ephemeral: true });
+    await interaction.reply({ content: '❌ Error al guardar tu cumpleaños.', flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -154,7 +152,7 @@ async function handleGet(interaction) {
     if (!entry) {
       return interaction.reply({
         content: '📭 No tienes un cumpleaños guardado. Usa `/birthday set DD-MM-YYYY` para guardarlo.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
@@ -169,7 +167,7 @@ async function handleGet(interaction) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     logger.error('Error getting birthday:', error);
-    await interaction.reply({ content: '❌ Error al obtener tu cumpleaños.', ephemeral: true });
+    await interaction.reply({ content: '❌ Error al obtener tu cumpleaños.', flags: MessageFlags.Ephemeral });
   }
 }
 
@@ -180,13 +178,13 @@ async function handleDelete(interaction) {
     if (result.changes === 0) {
       return interaction.reply({
         content: '📭 No tienes un cumpleaños guardado.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
-    await interaction.reply({ content: '✅ Tu cumpleaños ha sido eliminado.', ephemeral: true });
+    await interaction.reply({ content: '✅ Tu cumpleaños ha sido eliminado.', flags: MessageFlags.Ephemeral });
   } catch (error) {
     logger.error('Error deleting birthday:', error);
-    await interaction.reply({ content: '❌ Error al eliminar tu cumpleaños.', ephemeral: true });
+    await interaction.reply({ content: '❌ Error al eliminar tu cumpleaños.', flags: MessageFlags.Ephemeral });
   }
 }

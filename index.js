@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./utils/logger');
@@ -86,7 +86,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   } catch (error) {
     logger.error(`Error executing /${interaction.commandName}:`, error);
 
-    const reply = { content: '❌ Ocurrió un error al ejecutar el comando. Por favor, inténtalo de nuevo.', ephemeral: true };
+    const reply = { content: '❌ Ocurrió un error al ejecutar el comando. Por favor, inténtalo de nuevo.', flags: MessageFlags.Ephemeral };
 
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(reply).catch(() => {});

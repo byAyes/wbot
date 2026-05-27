@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, REST, Routes } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, REST, Routes, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
@@ -18,17 +18,17 @@ module.exports = {
     if (!ownerId) {
       return interaction.reply({
         content: '❌ `BOT_OWNER_ID` no está configurado en el archivo `.env` del servidor.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
     if (interaction.user.id !== ownerId) {
       return interaction.reply({
         content: '❌ Este comando solo puede ser usado por el dueño del bot.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const target = interaction.options.getString('target');
     const commandsPath = path.join(__dirname, '..', 'commands');
@@ -43,7 +43,7 @@ module.exports = {
       if (!fileName) {
         return interaction.followUp({
           content: `❌ No se encontró el comando \`/${target}\`. Comandos disponibles: \`${commandFiles.map(f => f.replace('.js', '')).join('`, `')}\``,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -107,7 +107,7 @@ module.exports = {
     lines.push(`📦 Caché de Node: ${Object.keys(require.cache).length} módulos cargados`);
     lines.push(`📋 Comandos en memoria: ${interaction.client.commands.size}`);
 
-    return interaction.followUp({ content: lines.join('\n'), ephemeral: true });
+    return interaction.followUp({ content: lines.join('\n'), flags: MessageFlags.Ephemeral });
   },
 };
 

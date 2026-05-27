@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const {
   getHallOfShameStats,
   getRecentHallOfShame,
@@ -47,7 +47,7 @@ module.exports = {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
         return interaction.reply({
           content: '❌ Necesitas el permiso **Gestionar Canales** para configurar el Hall of Shame.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -58,7 +58,7 @@ module.exports = {
       if (!channel && !role && enabled === null) {
         return interaction.reply({
           content: '❌ Debes especificar al menos una opción: `channel`, `role` o `enabled`.\n\nEjemplo:\n`/hos setup channel:#hall-of-shame role:@Mencionado`',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -82,7 +82,7 @@ module.exports = {
         logger.info(`HOS toggled to ${enabled} in guild ${guildId}`);
       }
 
-      return interaction.reply({ content: response, ephemeral: true });
+      return interaction.reply({ content: response, flags: MessageFlags.Ephemeral });
     }
 
     if (subcommand === 'config') {
@@ -120,7 +120,7 @@ module.exports = {
       if (!stats || stats.length === 0) {
         return interaction.reply({
           content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Carlos** para hacerlo.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -146,7 +146,7 @@ module.exports = {
       if (!entries || entries.length === 0) {
         return interaction.reply({
           content: '🏆 El Hall of Shame está vacío... ¡sé el primero en nominar a alguien!\n\nResponde a un mensaje y menciona a **@Carlos** para hacerlo.',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
