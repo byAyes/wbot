@@ -16,7 +16,7 @@ module.exports = {
       .setTitle('🔗 Invita a Carlos')
       .setDescription(
         '¡Agrega **Carlos** a tu servidor y disfruta de:\n\n' +
-        '🎵 Descarga música y videos de YouTube, Spotify\n' +
+        '🎵 Descarga y reproduce música (YouTube, Spotify, Deezer)\n' +
         '🖼️ Descarga de Instagram, Pinterest\n' +
         '🏆 Sistema de Hall of Shame\n' +
         '🎂 Recordatorio de cumpleaños\n' +

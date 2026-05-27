@@ -3,30 +3,147 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const logger = require('./utils/logger');
 
 const commands = [
-  // --- Play (YouTube, SoundCloud, Spotify) ---
+  // --- Play (Music System - replaces old /play + /music) ---
   new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Busca y descarga música/video de YouTube, SoundCloud y Spotify')
-    .addStringOption(option =>
-      option.setName('query')
-        .setDescription('Nombre de la canción/video o URL (YouTube, Spotify, SoundCloud)')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('formato')
-        .setDescription('Formato de descarga')
-        .setRequired(false)
-        .addChoices(
-          { name: 'Audio (MP3)', value: 'audio' },
-          { name: 'Video (MP4)', value: 'video' },
-        ))
-    .addStringOption(option =>
-      option.setName('fuente')
-        .setDescription('Fuente de búsqueda (se auto-detecta si es una URL)')
-        .setRequired(false)
-        .addChoices(
-          { name: 'YouTube', value: 'youtube' },
-          { name: 'SoundCloud', value: 'soundcloud' },
-        )),
+    .setDescription('🎵 Reproduce música, descarga audio/video y administra la cola')
+    .addSubcommand(sub =>
+      sub.setName('play')
+        .setDescription('Reproduce música en tu canal de voz (YouTube, Spotify, SoundCloud, Deezer)')
+        .addStringOption(option =>
+          option.setName('query')
+            .setDescription('Nombre de la canción o URL')
+            .setRequired(true)))
+    .addSubcommand(sub =>
+      sub.setName('download')
+        .setDescription('Descarga audio/video de YouTube, SoundCloud, Spotify o Deezer')
+        .addStringOption(option =>
+          option.setName('query')
+            .setDescription('Nombre de la canción/video o URL')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('formato')
+            .setDescription('Formato de descarga')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Audio (MP3)', value: 'audio' },
+              { name: 'Video (MP4)', value: 'video' },
+            ))
+        .addStringOption(option =>
+          option.setName('fuente')
+            .setDescription('Fuente de búsqueda (se auto-detecta si es URL)')
+            .setRequired(false)
+            .addChoices(
+              { name: 'YouTube', value: 'youtube' },
+              { name: 'SoundCloud', value: 'soundcloud' },
+            )))
+    .addSubcommand(sub =>
+      sub.setName('skip')
+        .setDescription('Saltar a la siguiente canción'))
+    .addSubcommand(sub =>
+      sub.setName('stop')
+        .setDescription('Detiene la música y sale del canal'))
+    .addSubcommand(sub =>
+      sub.setName('pause')
+        .setDescription('Pausa la reproducción'))
+    .addSubcommand(sub =>
+      sub.setName('resume')
+        .setDescription('Reanuda la reproducción'))
+    .addSubcommand(sub =>
+      sub.setName('nowplaying')
+        .setDescription('Muestra la canción actual'))
+    .addSubcommand(sub =>
+      sub.setName('queue')
+        .setDescription('Muestra la cola de reproducción'))
+    .addSubcommand(sub =>
+      sub.setName('volume')
+        .setDescription('Ajusta el volumen (1-100)')
+        .addIntegerOption(option =>
+          option.setName('nivel')
+            .setDescription('Nivel de volumen')
+            .setRequired(true)
+            .setMinValue(1)
+            .setMaxValue(100)))
+    .addSubcommand(sub =>
+      sub.setName('shuffle')
+        .setDescription('Activa/desactiva el modo aleatorio'))
+    .addSubcommand(sub =>
+      sub.setName('loop')
+        .setDescription('Cambia el modo de repetición')
+        .addStringOption(option =>
+          option.setName('modo')
+            .setDescription('Modo de repetición')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Desactivado', value: 'off' },
+              { name: 'Repetir canción', value: 'track' },
+              { name: 'Repetir cola', value: 'queue' },
+              { name: 'Autoplay', value: 'autoplay' },
+            )))
+    .addSubcommand(sub =>
+      sub.setName('remove')
+        .setDescription('Elimina una canción de la cola')
+        .addIntegerOption(option =>
+          option.setName('numero')
+            .setDescription('Número de la canción en la cola')
+            .setRequired(true)
+            .setMinValue(1)))
+    .addSubcommand(sub =>
+      sub.setName('move')
+        .setDescription('Mueve una canción a otra posición')
+        .addIntegerOption(option =>
+          option.setName('desde')
+            .setDescription('Posición actual')
+            .setRequired(true)
+            .setMinValue(1))
+        .addIntegerOption(option =>
+          option.setName('hasta')
+            .setDescription('Nueva posición')
+            .setRequired(true)
+            .setMinValue(1)))
+    .addSubcommand(sub =>
+      sub.setName('seek')
+        .setDescription('Adelanta/retrocede a un punto de la canción')
+        .addIntegerOption(option =>
+          option.setName('segundos')
+            .setDescription('Posición en segundos')
+            .setRequired(true)
+            .setMinValue(0)))
+    .addSubcommand(sub =>
+      sub.setName('lyrics')
+        .setDescription('Muestra la letra de la canción actual'))
+    .addSubcommand(sub =>
+      sub.setName('filters')
+        .setDescription('Activa o desactiva filtros de audio')
+        .addStringOption(option =>
+          option.setName('filtro')
+            .setDescription('Filtro a aplicar')
+            .setRequired(true)
+            .addChoices(
+              { name: 'Bass Boost (Bajo)', value: 'bassboost_low' },
+              { name: 'Bass Boost', value: 'bassboost' },
+              { name: 'Bass Boost (Alto)', value: 'bassboost_high' },
+              { name: '8D', value: '8D' },
+              { name: 'Vaporwave', value: 'vaporwave' },
+              { name: 'Nightcore', value: 'nightcore' },
+              { name: 'Phaser', value: 'phaser' },
+              { name: 'Tremolo', value: 'tremolo' },
+              { name: 'Vibrato', value: 'vibrato' },
+              { name: 'Reverse', value: 'reverse' },
+              { name: 'Treble', value: 'treble' },
+              { name: 'Normalizer', value: 'normalizer' },
+              { name: 'Karaoke', value: 'karaoke' },
+              { name: 'Flanger', value: 'flanger' },
+              { name: 'Compresor', value: 'compressor' },
+              { name: 'Lo-Fi', value: 'lofi' },
+              { name: 'Earrape', value: 'earrape' },
+              { name: 'Surround', value: 'surrounding' },
+              { name: 'Sub Boost', value: 'subboost' },
+              { name: 'Mono', value: 'mono' },
+            )))
+    .addSubcommand(sub =>
+      sub.setName('clear')
+        .setDescription('Limpia toda la cola de reproducción')),
 
   // --- Spotify ---
   new SlashCommandBuilder()
@@ -93,124 +210,7 @@ const commands = [
       sub.setName('delete')
         .setDescription('Elimina tu cumpleaños guardado')),
 
-  // --- Music ---
-  new SlashCommandBuilder()
-    .setName('music')
-    .setDescription('🎵 Sistema de música en canales de voz')
-    .addSubcommand(sub =>
-      sub.setName('play')
-        .setDescription('Reproduce música desde YouTube, Spotify o SoundCloud')
-        .addStringOption(option =>
-          option.setName('query')
-            .setDescription('Nombre de la cancion o URL')
-            .setRequired(true)))
-    .addSubcommand(sub =>
-      sub.setName('skip')
-        .setDescription('Saltar a la siguiente cancion'))
-    .addSubcommand(sub =>
-      sub.setName('stop')
-        .setDescription('Detiene la musica y sale del canal'))
-    .addSubcommand(sub =>
-      sub.setName('pause')
-        .setDescription('Pausa la reproduccion'))
-    .addSubcommand(sub =>
-      sub.setName('resume')
-        .setDescription('Reanuda la reproduccion'))
-    .addSubcommand(sub =>
-      sub.setName('nowplaying')
-        .setDescription('Muestra la cancion actual'))
-    .addSubcommand(sub =>
-      sub.setName('queue')
-        .setDescription('Muestra la cola de reproduccion'))
-    .addSubcommand(sub =>
-      sub.setName('volume')
-        .setDescription('Ajusta el volumen (1-100)')
-        .addIntegerOption(option =>
-          option.setName('nivel')
-            .setDescription('Nivel de volumen')
-            .setRequired(true)
-            .setMinValue(1)
-            .setMaxValue(100)))
-    .addSubcommand(sub =>
-      sub.setName('shuffle')
-        .setDescription('Activa/desactiva el modo aleatorio'))
-    .addSubcommand(sub =>
-      sub.setName('loop')
-        .setDescription('Cambia el modo de repeticion')
-        .addStringOption(option =>
-          option.setName('modo')
-            .setDescription('Modo de repeticion')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Desactivado', value: 'off' },
-              { name: 'Repetir cancion', value: 'track' },
-              { name: 'Repetir cola', value: 'queue' },
-              { name: 'Autoplay', value: 'autoplay' },
-            )))
-    .addSubcommand(sub =>
-      sub.setName('remove')
-        .setDescription('Elimina una cancion de la cola')
-        .addIntegerOption(option =>
-          option.setName('numero')
-            .setDescription('Numero de la cancion en la cola')
-            .setRequired(true)
-            .setMinValue(1)))
-    .addSubcommand(sub =>
-      sub.setName('move')
-        .setDescription('Mueve una cancion a otra posicion')
-        .addIntegerOption(option =>
-          option.setName('desde')
-            .setDescription('Posicion actual')
-            .setRequired(true)
-            .setMinValue(1))
-        .addIntegerOption(option =>
-          option.setName('hasta')
-            .setDescription('Nueva posicion')
-            .setRequired(true)
-            .setMinValue(1)))
-    .addSubcommand(sub =>
-      sub.setName('seek')
-        .setDescription('Adelanta/retrocede a un punto de la cancion')
-        .addIntegerOption(option =>
-          option.setName('segundos')
-            .setDescription('Posicion en segundos')
-            .setRequired(true)
-            .setMinValue(0)))
-    .addSubcommand(sub =>
-      sub.setName('lyrics')
-        .setDescription('Muestra la letra de la cancion actual'))
-    .addSubcommand(sub =>
-      sub.setName('filters')
-        .setDescription('Activa o desactiva filtros de audio')
-        .addStringOption(option =>
-          option.setName('filtro')
-            .setDescription('Filtro a aplicar')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Bass Boost (Bajo)', value: 'bassboost_low' },
-              { name: 'Bass Boost', value: 'bassboost' },
-              { name: 'Bass Boost (Alto)', value: 'bassboost_high' },
-              { name: '8D', value: '8D' },
-              { name: 'Vaporwave', value: 'vaporwave' },
-              { name: 'Nightcore', value: 'nightcore' },
-              { name: 'Phaser', value: 'phaser' },
-              { name: 'Tremolo', value: 'tremolo' },
-              { name: 'Vibrato', value: 'vibrato' },
-              { name: 'Reverse', value: 'reverse' },
-              { name: 'Treble', value: 'treble' },
-              { name: 'Normalizer', value: 'normalizer' },
-              { name: 'Karaoke', value: 'karaoke' },
-              { name: 'Flanger', value: 'flanger' },
-              { name: 'Compresor', value: 'compressor' },
-              { name: 'Lo-Fi', value: 'lofi' },
-              { name: 'Earrape', value: 'earrape' },
-              { name: 'Surround', value: 'surrounding' },
-              { name: 'Sub Boost', value: 'subboost' },
-              { name: 'Mono', value: 'mono' },
-            )))
-    .addSubcommand(sub =>
-      sub.setName('clear')
-        .setDescription('Limpia toda la cola de reproduccion')),
+
 
   // --- Hall of Shame ---
   new SlashCommandBuilder()

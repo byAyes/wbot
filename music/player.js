@@ -63,7 +63,7 @@ async function initPlayer(client) {
       // Si el metadata es una interacción, ya mostró el embed en el comando
       if (metadata.reply && metadata.editReply) return;
 
-      const sourceIcon = { youtube: '▶️', spotify: '🎵', soundcloud: '☁️', apple_music: '🍎' }[track.source] || '🎵';
+      const sourceIcon = { youtube: '▶️', spotify: '🎵', soundcloud: '☁️', apple_music: '🍎', deezer: '📻' }[track.source] || '🎵';
       try {
         metadata.channel.send({
           content: `${sourceIcon} **${track.title}** - *${track.author}* (${queue.tracks.size} en cola)`,
@@ -94,7 +94,7 @@ async function initPlayer(client) {
         // Autoplay is on, don't send empty queue message
         return;
       }
-      metadata.channel.send('📭 La cola ha terminado. Añade más canciones con `/music play`.').catch(() => {});
+      metadata.channel.send('📭 La cola ha terminado. Añade más canciones con `/play play`.').catch(() => {});
     }
   });
 

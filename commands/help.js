@@ -12,36 +12,30 @@ module.exports = {
       .setDescription('Bot multimedia con descargas y utilidades')
       .addFields(
         {
-          name: '🎵 Música y Video',
+          name: '🎵 Sistema de Música (/play)',
           value:
-            '`/play <query> [formato] [fuente]` - Descarga de\n' +
-            '  YouTube, SoundCloud o Spotify (pega la URL)\n' +
-            '`/download <url> [formato]` - Descarga desde enlace directo',
+            '`/play play <query>` - Reproduce en voz (YT/Spotify/SC/Deezer)\n' +
+            '`/play download <q> [fmt] [src]` - Descarga archivo\n' +
+            '`/play skip` / `stop` / `pause` / `resume`\n' +
+            '`/play nowplaying` - Canción actual\n' +
+            '`/play queue` - Cola de reproducción\n' +
+            '`/play volume <1-100>` - Volumen\n' +
+            '`/play shuffle` - Modo aleatorio\n' +
+            '`/play loop <off/track/queue/autoplay>`\n' +
+            '`/play remove <#>` - Quitar canción de la cola\n' +
+            '`/play move <desde> <hasta>` - Reordenar\n' +
+            '`/play seek <segundos>` - Adelantar/retroceder\n' +
+            '`/play lyrics` - Letra de la canción actual\n' +
+            '`/play filters <filtro>` - Efectos de audio (20)\n' +
+            '`/play clear` - Limpiar la cola',
           inline: false,
         },
         {
           name: '🖼️ Redes Sociales',
           value:
             '`/pinterest <url>` - Descarga de Pinterest\n' +
-            '`/instagram <url>` - Descarga de Instagram',
-          inline: false,
-        },
-        {
-          name: '🎵 Música en Voz',
-          value:
-            '`/music play <query>` - Reproduce música (YT/Spotify/SC)\n' +
-            '`/music skip` / `stop` / `pause` / `resume`\n' +
-            '`/music nowplaying` - Canción actual\n' +
-            '`/music queue` - Cola de reproducción\n' +
-            '`/music volume <1-100>` - Volumen\n' +
-            '`/music shuffle` - Modo aleatorio\n' +
-            '`/music loop <off/track/queue/autoplay>`\n' +
-            '`/music remove <#>` - Quitar canción de la cola\n' +
-            '`/music move <desde> <hasta>` - Reordenar\n' +
-            '`/music seek <segundos>` - Adelantar/retroceder\n' +
-            '`/music lyrics` - Letra de la canción actual\n' +
-            '`/music filters <filtro>` - Efectos de audio (18)\n' +
-            '`/music clear` - Limpiar la cola',
+            '`/instagram <url>` - Descarga de Instagram\n' +
+            '`/download <url> [formato]` - Descarga desde enlace directo',
           inline: false,
         },
         {
