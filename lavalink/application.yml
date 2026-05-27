@@ -1,0 +1,98 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: false
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    oauth:
+      enabled: false
+      # To enable YouTube OAuth, set enabled: true and run the bot once -
+      # it will generate a token file. Or configure accessToken manually.
+
+lavalink:
+  plugins:
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.4.0"
+      snapshot: false
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.8.2"
+      snapshot: false
+  server:
+    sources:
+      youtube: false        # Disable built-in YouTube (use plugin instead)
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    youtubeSearchEnabled: false  # Disable built-in search (use plugin)
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      rotation: true
+      distortion: true
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    keepAlive:
+      enabled: true
+      interval: 30
+    gc:
+      enabled: true
+      interval: 60
+
+plugins:
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""      # Search by ISRC
+      - "ytsearch:\"%QUERY%\""     # Fallback to YouTube search
+      - "scsearch:\"%QUERY%\""     # SoundCloud search
+    sources:
+      spotify: true
+      applemusic: false
+      deezer: false
+      youtube: true
+      soundcloud: true
+    spotify:
+      clientId: "${SPOTIFY_CLIENT_ID}"
+      clientSecret: "${SPOTIFY_CLIENT_SECRET}"
+      countryCode: "US"
+      playlistLoadLimit: 6
+    soundcloud:
+      countryCode: "US"
+
+metrics:
+  prometheus:
+    enabled: false
+    endpoint: /metrics
+
+sentry:
+  enabled: false
+  dsn: ""
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
+    com.sedmelluq: INFO
+  request:
+    enabled: false
+    includeClientInfo: true
+    includeHeaders: false
+    includeQueryString: true
+    includePayload: true
+    maxPayloadLength: 10000
+  logback:
+    rollingpolicy:
+      max-history: 7
+      max-file-size: 10MB

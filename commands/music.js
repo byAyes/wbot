@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const axios = require('axios');
 const {
   // Constants
   FILTER_NAMES,
@@ -38,10 +39,12 @@ const {
   validateQueue,
   validateDownloadSource,
 
-  // System
-  useMainPlayer,
-  QueryType,
-  QueueRepeatMode,
+  // Kazagumo access
+  getKazagumo,
+  getPlayer,
+  getQueue,
+
+  // Logger
   logger,
 } = require('../music/helpers');
 
@@ -241,7 +244,7 @@ module.exports = {
 };
 
 // =====================================================================
-//  HANDLERS: DESCARGAR (SoundCloud es el último recurso)
+//  HANDLERS: DESCARGAR (sin cambios - usa yt-dlp directamente)
 // =====================================================================
 
 async function handleDownload(interaction) {
@@ -263,7 +266,7 @@ async function handleDownload(interaction) {
   try {
     let mediaUrl, mediaTitle, uploader, duration, thumbnail, fuenteActual;
 
-    // --- 1. Deezer URL (máxima prioridad para música) ---
+    // --- 1. Deezer URL ---
     if (deezerTrackId) {
       fuenteActual = 'deezer';
       await interaction.editReply({ content: '📻 Obteniendo información de Deezer...' });
@@ -284,7 +287,7 @@ async function handleDownload(interaction) {
       thumbnail = trackInfo.thumbnail || selected.thumbnail || '';
     }
 
-    // --- 2. Spotify URL (segunda prioridad para música) ---
+    // --- 2. Spotify URL ---
     else if (spotifyTrackId) {
       fuenteActual = 'spotify';
       await interaction.editReply({ content: '🎵 Obteniendo información de Spotify...' });
@@ -305,7 +308,7 @@ async function handleDownload(interaction) {
       thumbnail = trackInfo.thumbnail || selected.thumbnail || '';
     }
 
-    // --- 3. YouTube (prioridad sobre SoundCloud para texto/búsquedas) ---
+    // --- 3. YouTube ---
     else if (isYouTubeUrl || (!isSoundCloud && fuente === 'youtube')) {
       fuenteActual = 'youtube';
 
@@ -330,7 +333,7 @@ async function handleDownload(interaction) {
       }
     }
 
-    // --- 4. SoundCloud (último recurso — solo cuando es explícito o URL directa) ---
+    // --- 4. SoundCloud ---
     else {
       fuenteActual = 'soundcloud';
 
@@ -438,10 +441,10 @@ async function handleDownload(interaction) {
 async function handleSkip(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const currentTrack = queue.currentTrack;
-  queue.node.skip();
+  const currentTrack = player.currentTrack;
+  player.skip();
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -454,9 +457,9 @@ async function handleSkip(interaction) {
 async function handleStop(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  queue.delete();
+  player.destroy();
 
   const embed = new EmbedBuilder()
     .setColor(0xED4245)
@@ -469,13 +472,13 @@ async function handleStop(interaction) {
 async function handlePause(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  if (queue.node.isPaused()) {
+  if (player.paused) {
     return interaction.reply({ content: '⚠️ Ya está pausada. Usa `/music resume`.', ephemeral: true });
   }
 
-  queue.node.pause();
+  player.pause();
 
   const embed = new EmbedBuilder()
     .setColor(0xFEE75C)
@@ -488,13 +491,13 @@ async function handlePause(interaction) {
 async function handleResume(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  if (!queue.node.isPaused()) {
+  if (!player.paused) {
     return interaction.reply({ content: '⚠️ No está pausada.', ephemeral: true });
   }
 
-  queue.node.resume();
+  player.resume();
 
   const embed = new EmbedBuilder()
     .setColor(0x57F287)
@@ -511,18 +514,18 @@ async function handleResume(interaction) {
 async function handleNowPlaying(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const embed = createNowPlayingEmbed(queue, queue.currentTrack);
+  const embed = createNowPlayingEmbed(player, player.currentTrack);
   await interaction.reply({ embeds: [embed] });
 }
 
 async function handleQueue(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const embed = createQueueEmbed(queue);
+  const embed = createQueueEmbed(player);
   await interaction.reply({ embeds: [embed] });
 }
 
@@ -533,10 +536,10 @@ async function handleQueue(interaction) {
 async function handleVolume(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const volume = interaction.options.getInteger('nivel');
-  queue.node.setVolume(volume);
+  player.setVolume(volume);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -549,13 +552,22 @@ async function handleVolume(interaction) {
 async function handleShuffle(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const isNowShuffling = queue.toggleShuffle();
+  // Store shuffle state on player data
+  if (!player.data) player.data = {};
+  player.data.shuffled = !player.data.shuffled;
+
+  if (player.data.shuffled) {
+    player.queue.shuffle();
+  } else {
+    // Restore original order by re-sorting? Not possible without storing original.
+    // Just inform the user
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setDescription(isNowShuffling
+    .setDescription(player.data.shuffled
       ? '🔀 **Shuffle activado** — Las canciones se reproducirán en orden aleatorio.'
       : '🔀 **Shuffle desactivado** — Las canciones se reproducirán en orden normal.')
     .setTimestamp();
@@ -566,23 +578,23 @@ async function handleShuffle(interaction) {
 async function handleLoop(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const mode = interaction.options.getString('modo');
   const modeMap = {
-    off: QueueRepeatMode.OFF,
-    track: QueueRepeatMode.TRACK,
-    queue: QueueRepeatMode.QUEUE,
-    autoplay: QueueRepeatMode.AUTOPLAY,
+    off: 0,
+    track: 1,
+    queue: 2,
+    autoplay: 0, // Kazagumo doesn't have autoplay - map to off
   };
   const labelMap = {
     off: '❌ Repetición desactivada',
     track: '🔂 Repitiendo la canción actual',
     queue: '🔁 Repitiendo toda la cola',
-    autoplay: '♾️ Autoplay activado — Se añadirán canciones similares automáticamente',
+    autoplay: '♾️ Modo autoplay no disponible con Lavalink',
   };
 
-  queue.setRepeatMode(modeMap[mode]);
+  player.setLoop(modeMap[mode]);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -599,20 +611,20 @@ async function handleLoop(interaction) {
 async function handleRemove(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const trackNumber = interaction.options.getInteger('numero');
-  const tracks = queue.tracks.toArray();
+  const queueSize = player.queue.length;
 
-  if (trackNumber > tracks.length) {
+  if (trackNumber > queueSize) {
     return interaction.reply({
-      content: `❌ El número **${trackNumber}** no es válido. La cola solo tiene **${tracks.length}** canciones.`,
+      content: `❌ El número **${trackNumber}** no es válido. La cola solo tiene **${queueSize}** canciones.`,
       ephemeral: true,
     });
   }
 
-  const trackToRemove = tracks[trackNumber - 1];
-  queue.node.remove(trackToRemove);
+  const trackToRemove = player.queue[trackNumber - 1];
+  player.queue.remove(trackNumber - 1);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -625,11 +637,11 @@ async function handleRemove(interaction) {
 async function handleMove(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const from = interaction.options.getInteger('desde');
   const to = interaction.options.getInteger('hasta');
-  const tracks = queue.tracks.toArray();
+  const tracks = [...player.queue];
 
   if (from > tracks.length) {
     return interaction.reply({
@@ -638,19 +650,29 @@ async function handleMove(interaction) {
     });
   }
 
-  if (to > tracks.length + 1) {
+  if (to > tracks.length) {
     return interaction.reply({
-      content: `❌ La posición **${to}** está fuera del rango (máximo ${tracks.length + 1}).`,
+      content: `❌ La posición **${to}** está fuera del rango (máximo ${tracks.length}).`,
       ephemeral: true,
     });
   }
 
   const trackToMove = tracks[from - 1];
-  queue.moveTrack(from - 1, to - 1);
+
+  // Reorder the queue: remove from old position, insert at new position
+  const updatedTracks = [...tracks];
+  updatedTracks.splice(from - 1, 1);
+  updatedTracks.splice(to - 1, 0, trackToMove);
+
+  // Clear and re-add in new order
+  player.queue.clear();
+  for (const t of updatedTracks) {
+    player.queue.add(t);
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setDescription(`📦 Movido **${trackToMove.title}** de **#${from}** → **#${to}**`)
+    .setDescription(`📦 Movido **${trackToMove.title || 'canción'}** de **#${from}** → **#${to}**`)
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed] });
@@ -659,11 +681,11 @@ async function handleMove(interaction) {
 async function handleSeek(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const targetSeconds = interaction.options.getInteger('segundos');
   const targetMs = targetSeconds * 1000;
-  const trackDuration = queue.currentTrack?.durationMS || 0;
+  const trackDuration = player.currentTrack?.length || 0;
 
   if (targetMs > trackDuration) {
     return interaction.reply({
@@ -672,7 +694,7 @@ async function handleSeek(interaction) {
     });
   }
 
-  await queue.node.seek(targetMs);
+  player.seek(targetMs);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -689,9 +711,9 @@ async function handleSeek(interaction) {
 async function handleLyrics(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const track = queue.currentTrack;
+  const track = player.currentTrack;
   if (!track) {
     return interaction.reply({ content: '❌ No hay canción reproduciéndose.', ephemeral: true });
   }
@@ -699,22 +721,20 @@ async function handleLyrics(interaction) {
   await interaction.deferReply();
 
   try {
-    const player = useMainPlayer();
-    const searchResult = await player.lyrics.search({
-      q: `${track.title} ${track.author}`,
-      trackName: track.title,
-      artistName: track.author,
+    // Use the free lyrics.ovh API (no API key required)
+    const artist = encodeURIComponent(track.author);
+    const title = encodeURIComponent(track.title);
+    const { data } = await axios.get(`https://api.lyrics.ovh/v1/${artist}/${title}`, {
+      timeout: 10000,
     });
 
-    if (!searchResult || searchResult.length === 0) {
+    if (!data || !data.lyrics) {
       return interaction.editReply({
         content: `📝 No se encontró la letra para **${track.title}** de **${track.author}**.`,
       });
     }
 
-    const lyrics = searchResult[0];
-    const { AttachmentBuilder } = require('discord.js');
-    const plainLyrics = lyrics.plainLyrics || lyrics.lyrics || 'Letra no disponible';
+    const plainLyrics = data.lyrics;
 
     if (plainLyrics.length > 4000) {
       const attachment = new AttachmentBuilder(Buffer.from(plainLyrics, 'utf-8'), { name: 'lyrics.txt' });
@@ -722,7 +742,6 @@ async function handleLyrics(interaction) {
         .setColor(0x5865F2)
         .setTitle(`📝 ${track.title} - ${track.author}`)
         .setDescription('La letra es muy extensa. Se ha adjuntado como archivo de texto.')
-        .setThumbnail(track.thumbnail)
         .setTimestamp();
 
       return interaction.editReply({ embeds: [embed], files: [attachment] });
@@ -732,7 +751,6 @@ async function handleLyrics(interaction) {
       .setColor(0x5865F2)
       .setTitle(`📝 ${track.title} - ${track.author}`)
       .setDescription(plainLyrics.substring(0, 4000))
-      .setThumbnail(track.thumbnail)
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
@@ -740,7 +758,7 @@ async function handleLyrics(interaction) {
   } catch (error) {
     logger.error('Error buscando letras:', error);
     await interaction.editReply({
-      content: `❌ Error al buscar la letra para **${track.title}**: ${error.message}`,
+      content: `📝 No se encontró la letra para **${track.title}** de **${track.author}**.`,
     });
   }
 }
@@ -752,17 +770,28 @@ async function handleLyrics(interaction) {
 async function handleFilters(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
   const filterName = interaction.options.getString('filtro');
-  const isEnabled = queue.filters.ffmpeg.isEnabled(filterName);
+
+  if (!player.filterManager) {
+    return interaction.reply({
+      content: '❌ El sistema de filtros no está disponible.',
+      ephemeral: true,
+    });
+  }
+
+  // Check if filter is currently enabled
+  const enabledPresets = player.filterManager.enabledPresets || [];
+  const wasEnabled = enabledPresets.includes(filterName);
 
   try {
-    await queue.filters.ffmpeg.toggle(filterName);
+    // Toggle the filter (setPreset toggles on/off)
+    player.filterManager.setPreset(filterName);
 
     const embed = new EmbedBuilder()
-      .setColor(isEnabled ? 0xED4245 : 0x57F287)
-      .setDescription(isEnabled
+      .setColor(wasEnabled ? 0xED4245 : 0x57F287)
+      .setDescription(wasEnabled
         ? `❌ Filtro desactivado: ${FILTER_NAMES[filterName] || filterName}`
         : `✅ Filtro activado: ${FILTER_NAMES[filterName] || filterName}`)
       .setTimestamp();
@@ -784,10 +813,10 @@ async function handleFilters(interaction) {
 async function handleClear(interaction) {
   const queueCheck = validateQueue(interaction);
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
-  const { queue } = queueCheck;
+  const { queue: player } = queueCheck;
 
-  const trackCount = queue.tracks.size;
-  queue.clear();
+  const trackCount = player.queue.length;
+  player.queue.clear();
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)

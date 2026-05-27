@@ -1,72 +1,87 @@
-const { Player } = require('discord-player');
-const { YoutubeExtractor } = require('@distube/yt-dlp');
-const {
-  DefaultExtractors,
-  SpotifyExtractor,
-  SoundCloudExtractor,
-  AppleMusicExtractor,
-} = require('@discord-player/extractor');
+const { Kazagumo } = require('kazagumo');
+const { Connectors } = require('shoukaku');
+const { KazagumoFilter } = require('kazagumo-filter');
 const logger = require('../utils/logger');
 
-let player = null;
+let kazagumo = null;
 
 /**
- * Initializes the Discord Player with all extractors
+ * Builds the Lavalink node configuration from environment variables
+ */
+function getLavalinkNodes() {
+  const nodes = [
+    {
+      name: process.env.LAVALINK_NODE_NAME || 'main',
+      url: process.env.LAVALINK_HOST || 'localhost:2333',
+      auth: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
+      secure: (process.env.LAVALINK_SECURE || 'false') === 'true',
+    },
+  ];
+
+  // Support multiple nodes via comma-separated env vars
+  const extraHosts = process.env.LAVALINK_EXTRA_HOSTS;
+  if (extraHosts) {
+    const hosts = extraHosts.split(',').map(s => s.trim());
+    hosts.forEach((host, i) => {
+      nodes.push({
+        name: `node-${i + 2}`,
+        url: host,
+        auth: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
+        secure: (process.env.LAVALINK_SECURE || 'false') === 'true',
+      });
+    });
+  }
+
+  return nodes;
+}
+
+/**
+ * Initializes the Kazagumo/Lavalink music system
  * @param {import('discord.js').Client} client - The Discord client
- * @returns {Promise<Player>} - The initialized Player instance
+ * @returns {Promise<Kazagumo>} - The initialized Kazagumo instance
  */
 async function initPlayer(client) {
-  if (player) return player;
+  if (kazagumo) return kazagumo;
 
-  player = new Player(client, {
-    skipFFmpeg: false,
-    connectionTimeout: 30000,
-    lagMonitor: 1000,
-  });
+  logger.info('Inicializando sistema de música Kazagumo + Lavalink...');
 
-  // Register extractors
-  logger.info('Registering music extractors...');
+  const lavalinkNodes = getLavalinkNodes();
 
-  // 1. Register DefaultExtractors bundle (Spotify, SoundCloud, Apple Music, Vimeo, etc.)
-  // Spotify works anonymously (no credentials needed) but you can also set them via env vars
-  await player.extractors.loadMulti(DefaultExtractors, {
-    spotify: {
-      clientId: process.env.SPOTIFY_CLIENT_ID || null,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET || null,
+  kazagumo = new Kazagumo(
+    {
+      plugins: [new KazagumoFilter()],
+      defaultVolume: 50,
+      leaveOnEmpty: {
+        enabled: true,
+        cooldown: 300000, // 5 minutes
+      },
+      leaveOnEnd: {
+        enabled: true,
+        cooldown: 300000,
+      },
     },
-    soundcloud: {},
-    appleMusic: {},
-  });
+    new Connectors.DiscordJS(client),
+    lavalinkNodes,
+    {
+      defaultVolume: 50,
+      moveOnDisconnect: true,
+      resumable: true,
+      resumeTimeout: 30,
+      reconnectTries: 5,
+      reconnectInterval: 5000,
+    },
+  );
 
-  // 2. Register YouTube extractor (uses yt-dlp)
-  await player.extractors.register(YoutubeExtractor, {
-    createFFmpegStream: true,
-  });
+  // ========== EVENTS ==========
 
-  logger.success(`Extractores registrados: ${player.extractors.size}`);
-
-  // --- Queue Events ---
-
-  player.events.on('connection', (queue) => {
-    logger.debug(`Conectado al canal de voz en ${queue.guild.name}`);
-  });
-
-  player.events.on('disconnect', (queue) => {
-    logger.debug(`Desconectado del canal de voz en ${queue.guild.name}`);
-  });
-
-  player.events.on('playerStart', (queue, track) => {
-    const metadata = queue.metadata;
-    // Solo enviamos notificación si NO viene de un comando interactivo
-    // (cuando es auto-avance por skip, fin de canción o autoplay)
-    if (metadata && typeof metadata.channel?.send === 'function') {
-      // Si el metadata es una interacción, ya mostró el embed en el comando
-      if (metadata.reply && metadata.editReply) return;
-
-      const sourceIcon = { youtube: '▶️', spotify: '🎵', soundcloud: '☁️', apple_music: '🍎', deezer: '📻' }[track.source] || '🎵';
+  // When a track starts playing
+  kazagumo.on('playerStart', (player, track) => {
+    const data = player.data;
+    if (data && typeof data.channel?.send === 'function') {
+      const sourceIcon = getTrackIcon(track);
       try {
-        metadata.channel.send({
-          content: `${sourceIcon} **${track.title}** - *${track.author}* (${queue.tracks.size} en cola)`,
+        data.channel.send({
+          content: `${sourceIcon} **${track.title}** - *${track.author}* (${player.queue.length} en cola)`,
         }).catch(() => {});
       } catch {
         // ignore
@@ -74,60 +89,112 @@ async function initPlayer(client) {
     }
   });
 
-  player.events.on('playerError', (queue, error, track) => {
+  // When a track ends
+  kazagumo.on('playerEnd', (_player, track) => {
+    logger.debug(`Track ended: ${track.title}`);
+  });
+
+  // When the queue is empty
+  kazagumo.on('queueEnd', (player) => {
+    const data = player.data;
+    if (data && typeof data.channel?.send === 'function') {
+      data.channel.send('📭 La cola ha terminado. Añade más canciones con `/play`.').catch(() => {});
+    }
+  });
+
+  // When all users leave the channel
+  kazagumo.on('playerEmpty', (player) => {
+    const data = player.data;
+    if (data && typeof data.channel?.send === 'function') {
+      data.channel.send('👋 Todos se fueron del canal. Saliendo...').catch(() => {});
+    }
+  });
+
+  // When a player error occurs
+  kazagumo.on('playerError', (player, error, track) => {
     logger.error('Player playback error:', error.message);
-    const metadata = queue.metadata;
-    if (metadata && typeof metadata.channel?.send === 'function') {
-      metadata.channel.send(`❌ Error al reproducir **${track.title}**: ${error.message}`).catch(() => {});
+    const data = player.data;
+    if (data && typeof data.channel?.send === 'function') {
+      data.channel.send(`❌ Error al reproducir **${track?.title || 'canción'}**: ${error.message}`).catch(() => {});
     }
   });
 
-  player.events.on('error', (queue, error) => {
-    logger.error('Queue error:', error.message);
+  // When a player is resumed (reconnection)
+  kazagumo.on('playerResumed', (player) => {
+    logger.debug(`Player resumed in guild ${player.guildId}`);
   });
 
-  player.events.on('emptyQueue', (queue) => {
-    const metadata = queue.metadata;
-    if (metadata && typeof metadata.channel?.send === 'function') {
-      const repeatMode = queue.repeatMode;
-      if (repeatMode === 3) {
-        // Autoplay is on, don't send empty queue message
-        return;
-      }
-      metadata.channel.send('📭 La cola ha terminado. Añade más canciones con `/play`.').catch(() => {});
-    }
+  // Lavalink node events
+  kazagumo.shoukaku.on('ready', (name, resumed) => {
+    logger.success(`Lavalink node "${name}" listo${resumed ? ' (reconectado)' : ''}`);
   });
 
-  player.events.on('emptyChannel', (queue) => {
-    const metadata = queue.metadata;
-    if (metadata && typeof metadata.channel?.send === 'function') {
-      metadata.channel.send('👋 Todos se fueron del canal. Saliendo...').catch(() => {});
-    }
+  kazagumo.shoukaku.on('error', (name, error) => {
+    logger.error(`Lavalink node "${name}" error:`, error.message);
   });
 
-  player.events.on('audioTrackAdd', (queue, track) => {
-    logger.debug(`Track añadido a la cola: ${track.title}`);
+  kazagumo.shoukaku.on('close', (name, code, reason) => {
+    logger.warn(`Lavalink node "${name}" cerrado: código=${code} motivo=${reason || 'desconocido'}`);
   });
 
-  player.events.on('audioTracksAdd', (queue, tracks) => {
-    logger.debug(`${tracks.length} tracks añadidos a la cola`);
+  kazagumo.shoukaku.on('disconnected', (name, playersMoved) => {
+    logger.warn(`Lavalink node "${name}" desconectado. Players movidos: ${playersMoved}`);
   });
 
-  logger.success('Sistema de música listo (YouTube, Spotify, SoundCloud, Apple Music)');
+  logger.success('Sistema de música Kazagumo + Lavalink inicializado');
+  return kazagumo;
+}
+
+/**
+ * Gets the Kazagumo instance
+ * @returns {Kazagumo|null}
+ */
+function getKazagumo() {
+  return kazagumo;
+}
+
+/**
+ * Gets the player for a guild
+ * @param {string} guildId - The guild ID
+ * @returns {import('kazagumo').KazagumoPlayer|null}
+ */
+function getPlayer(guildId) {
+  if (!kazagumo) return null;
+  return kazagumo.players.get(guildId);
+}
+
+/**
+ * Gets the queue/player for a guild (compatible with validateQueue)
+ * Returns null if no player or not playing
+ * @param {string} guildId - The guild ID
+ * @returns {import('kazagumo').KazagumoPlayer|null}
+ */
+function getQueue(guildId) {
+  const player = getPlayer(guildId);
+  if (!player || !player.playing) return null;
   return player;
 }
 
 /**
- * Gets the queue for a guild
- * @param {string} guildId - The guild ID
- * @returns {import('discord-player').GuildQueue|null}
+ * Gets the icon emoji for a track based on its source
+ * @param {import('kazagumo').KazagumoTrack} track
+ * @returns {string}
  */
-function getQueue(guildId) {
-  if (!player) return null;
-  return player.nodes.get(guildId);
+function getTrackIcon(track) {
+  if (!track) return '🎵';
+  const uri = track.uri || '';
+  const sourceName = track.sourceName || '';
+  if (sourceName.includes('spotify') || uri.includes('spotify')) return '🎵';
+  if (sourceName.includes('soundcloud') || uri.includes('soundcloud')) return '☁️';
+  if (sourceName.includes('apple') || uri.includes('apple')) return '🍎';
+  if (sourceName.includes('deezer') || uri.includes('deezer')) return '📻';
+  return '▶️';
 }
 
 module.exports = {
   initPlayer,
+  getKazagumo,
+  getPlayer,
   getQueue,
+  getTrackIcon,
 };

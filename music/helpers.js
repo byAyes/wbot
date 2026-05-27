@@ -1,8 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } = require('discord.js');
 const { json } = require('@distube/yt-dlp');
-const { useMainPlayer, QueryType, QueueRepeatMode } = require('discord-player');
 const axios = require('axios');
-const { getQueue } = require('./player');
+const { getQueue, getPlayer, getKazagumo } = require('./player');
 const logger = require('../utils/logger');
 
 // ========== CONSTANTS ==========
@@ -62,7 +61,6 @@ function formatRepeatMode(mode) {
     case 0: return '❌ Desactivado';
     case 1: return '🔂 Canción';
     case 2: return '🔁 Cola';
-    case 3: return '♾️ Autoplay';
     default: return '❌ Desactivado';
   }
 }
@@ -71,7 +69,7 @@ function formatRepeatMode(mode) {
 
 function extractYouTubeID(text) {
   const match = text.match(
-    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   );
   return match ? match[1] : null;
 }
@@ -94,48 +92,80 @@ function isSoundCloudUrl(text) {
 
 function getSourceIcon(track) {
   if (!track) return '🎵';
-  const source = track.source || track.queryType || '';
-  if (source.includes('spotify')) return '🎵';
-  if (source.includes('soundcloud')) return '☁️';
-  if (source.includes('apple')) return '🍎';
-  if (source.includes('deezer')) return '📻';
-  if (source.includes('youtube')) return '▶️';
-  return '🎵';
+  const uri = track.uri || '';
+  if (uri.includes('spotify')) return '🎵';
+  if (uri.includes('soundcloud')) return '☁️';
+  if (uri.includes('apple')) return '🍎';
+  if (uri.includes('deezer')) return '📻';
+  return '▶️';
 }
 
-function getActiveFilters(queue) {
-  if (!queue.filters?.ffmpeg) return [];
-  return Object.keys(FILTER_NAMES).filter(f => queue.filters.ffmpeg.isEnabled(f));
+/**
+ * Gets the active filter names from a Kazagumo player
+ * @param {import('kazagumo').KazagumoPlayer} player
+ * @returns {string[]}
+ */
+function getActiveFilters(player) {
+  if (!player.filterManager?.enabledPresets) return [];
+  const presets = player.filterManager.enabledPresets;
+  if (!Array.isArray(presets)) return [];
+  return presets.filter(f => FILTER_NAMES[f]);
+}
+
+/**
+ * Constructs a thumbnail URL for a track
+ * @param {import('kazagumo').KazagumoTrack} track
+ * @returns {string|null}
+ */
+function getTrackThumbnail(track) {
+  if (track.thumbnail) return track.thumbnail;
+  if (track.identifier && track.uri?.includes('youtu')) {
+    return `https://img.youtube.com/vi/${track.identifier}/mqdefault.jpg`;
+  }
+  return null;
+}
+
+// ========== PROGRESS BAR ==========
+
+function createProgressBar(currentMs, totalMs, length = 15) {
+  if (!totalMs || totalMs <= 0 || !currentMs || currentMs < 0) {
+    return '**[ ⏹️ En vivo ]**';
+  }
+  const progress = Math.min(currentMs / totalMs, 1);
+  const filled = Math.round(progress * length);
+  const empty = length - filled;
+  const bar = '█'.repeat(filled) + '░'.repeat(empty);
+  const currentStr = formatDurationMs(currentMs);
+  const totalStr = formatDurationMs(totalMs);
+  return `${currentStr} ${bar} ${totalStr}`;
 }
 
 // ========== EMBED BUILDERS ==========
 
-function createNowPlayingEmbed(queue, track) {
-  const progress = queue.node.createProgressBar({ timecodes: true });
-  const activeFilters = getActiveFilters(queue);
+function createNowPlayingEmbed(player, track) {
+  const progress = createProgressBar(player.position, track.length);
+  const activeFilters = getActiveFilters(player);
   const sourceIcon = getSourceIcon(track);
-  const sourceLabel = track.source || 'desconocida';
+  const thumbnail = getTrackThumbnail(track);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
     .setTitle(`${sourceIcon} Reproduciendo ahora`)
-    .setDescription(`**[${track.title}](${track.url})**\nPor **${track.author}**`)
+    .setDescription(`**[${track.title}](${track.uri})**\nPor **${track.author}**`)
     .addFields(
-      { name: '⏳ Duración', value: formatDurationMs(track.durationMS), inline: true },
-      { name: '👤 Solicitado por', value: `${track.requestedBy}`, inline: true },
-      { name: '📋 En cola', value: `${queue.tracks.size} canciones`, inline: true },
-    )
-    .setThumbnail(track.thumbnail);
+      { name: '⏳ Duración', value: formatDurationMs(track.length), inline: true },
+      { name: '👤 Solicitado por', value: `${track.requester}`, inline: true },
+      { name: '📋 En cola', value: `${player.queue.length} canciones`, inline: true },
+    );
 
-  if (progress) {
+  if (track.length > 0) {
     embed.addFields({ name: '▶️ Progreso', value: progress, inline: false });
   }
 
-  const repeatLabel = formatRepeatMode(queue.repeatMode);
+  const repeatLabel = formatRepeatMode(player.loop || 0);
   embed.addFields({ name: '🔁 Modo repetición', value: repeatLabel, inline: true });
 
-  const vol = queue.node.volume;
-  embed.addFields({ name: '🔊 Volumen', value: `${vol}%`, inline: true });
+  embed.addFields({ name: '🔊 Volumen', value: `${player.volume}%`, inline: true });
 
   if (activeFilters.length > 0) {
     embed.addFields({
@@ -145,34 +175,34 @@ function createNowPlayingEmbed(queue, track) {
     });
   }
 
-  embed.setFooter({ text: `Fuente: ${sourceLabel}` });
+  if (thumbnail) embed.setThumbnail(thumbnail);
+  embed.setFooter({ text: `Fuente: ${track.sourceName || 'desconocida'}` });
   embed.setTimestamp();
   return embed;
 }
 
-function createQueueEmbed(queue) {
-  const currentTrack = queue.currentTrack;
-  const tracks = queue.tracks.toArray();
-  const totalDuration = tracks.reduce((acc, t) => acc + (t.durationMS || 0), 0);
+function createQueueEmbed(player) {
+  const currentTrack = player.currentTrack;
+  const tracks = [...player.queue];
+  const totalDuration = tracks.reduce((acc, t) => acc + (t.length || 0), 0);
   const sourceIcon = currentTrack ? getSourceIcon(currentTrack) : '🎵';
-  const repeatLabel = formatRepeatMode(queue.repeatMode);
-  const isShuffling = queue.isShuffling ? '✅ Activado' : '❌ Desactivado';
-  const activeFilters = getActiveFilters(queue);
+  const repeatLabel = formatRepeatMode(player.loop || 0);
+  const thumbnail = currentTrack ? getTrackThumbnail(currentTrack) : null;
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
     .setTitle('📋 Cola de Reproducción')
     .setDescription(
       `**Reproduciendo ahora:**\n` +
-      `${sourceIcon} **[${currentTrack.title}](${currentTrack.url})** - *${currentTrack.author}*\n` +
-      `└ Solicitado por ${currentTrack.requestedBy}`
+      `${sourceIcon} **[${currentTrack.title}](${currentTrack.uri})** - *${currentTrack.author}*\n` +
+      `└ Solicitado por ${currentTrack.requester}`,
     )
     .addFields(
       { name: '🔁 Repetición', value: repeatLabel, inline: true },
-      { name: '🔀 Shuffle', value: isShuffling, inline: true },
-      { name: '🔊 Volumen', value: `${queue.node.volume}%`, inline: true },
+      { name: '🔊 Volumen', value: `${player.volume}%`, inline: true },
     );
 
+  const activeFilters = getActiveFilters(player);
   if (activeFilters.length > 0) {
     embed.addFields({
       name: '🎛️ Filtros',
@@ -181,13 +211,15 @@ function createQueueEmbed(queue) {
     });
   }
 
+  if (thumbnail) embed.setThumbnail(thumbnail);
+
   if (tracks.length === 0) {
     embed.addFields({ name: 'Próximas canciones', value: 'No hay más canciones en la cola.' });
   } else {
     let queueList = '';
     const maxShow = 10;
     tracks.slice(0, maxShow).forEach((track, index) => {
-      queueList += `**${index + 1}.** [${track.title}](${track.url}) - *${track.author}* (${formatDurationMs(track.durationMS)})\n`;
+      queueList += `**${index + 1}.** [${track.title}](${track.uri}) - *${track.author}* (${formatDurationMs(track.length)})\n`;
     });
     if (tracks.length > maxShow) {
       queueList += `\n*y ${tracks.length - maxShow} canciones más...*`;
@@ -214,9 +246,9 @@ async function showTrackSelection(interaction, tracks, context = 'play') {
     .addOptions(
       tracks.map((track, i) => ({
         label: (track.title || 'Desconocido').substring(0, 100),
-        description: `${(track.author || track.uploader || track.channel || 'Desconocido').substring(0, 50)} — ${formatDurationMs(track.durationMS || track.duration * 1000 || 0)}`,
+        description: `${(track.author || track.uploader || 'Desconocido').substring(0, 50)} — ${formatDurationMs(track.length || track.duration * 1000 || 0)}`,
         value: String(i),
-      }))
+      })),
     );
 
   const row = new ActionRowBuilder().addComponents(select);
@@ -236,7 +268,7 @@ async function showTrackSelection(interaction, tracks, context = 'play') {
     return tracks[selectedIndex];
   } catch {
     await interaction.editReply({
-      content: `⏰ Tiempo agotado. Usa el comando de nuevo.`,
+      content: '⏰ Tiempo agotado. Usa el comando de nuevo.',
       components: [],
     });
     return null;
@@ -292,7 +324,7 @@ async function searchYouTube(query) {
   }
 
   const videos = result.entries.filter(
-    e => e && e.webpage_url && e.title && e.duration > 0
+    e => e && e.webpage_url && e.title && e.duration > 0,
   );
 
   if (videos.length === 0) {
@@ -313,7 +345,7 @@ async function searchSoundCloud(query) {
   }
 
   const tracks = result.entries.filter(
-    e => e && e.webpage_url && e.title
+    e => e && e.webpage_url && e.title,
   );
 
   if (tracks.length === 0) {
@@ -384,7 +416,7 @@ function validateVoiceChannel(interaction) {
 
 function validateQueue(interaction) {
   const queue = getQueue(interaction.guildId);
-  if (!queue || !queue.isPlaying()) {
+  if (!queue) {
     return { valid: false, error: '❌ No hay nada reproduciéndose.', queue: null };
   }
   return { valid: true, queue };
@@ -412,22 +444,6 @@ function validateDownloadSource(query, formato, fuente, fuenteExplicit) {
   return { valid: true, spotifyTrackId, deezerTrackId, isSoundCloud, isYouTubeUrl };
 }
 
-// ========== COMMON NODE OPTIONS ==========
-
-function getPlayNodeOptions(metadata) {
-  return {
-    nodeOptions: {
-      metadata,
-      leaveOnEmpty: true,
-      leaveOnEmptyCooldown: 300000,
-      leaveOnEnd: true,
-      leaveOnEndCooldown: 300000,
-      selfDeaf: true,
-      skipOnNoStream: true,
-    },
-  };
-}
-
 // ========== EXPORTS ==========
 
 module.exports = {
@@ -449,6 +465,10 @@ module.exports = {
   // Source helpers
   getSourceIcon,
   getActiveFilters,
+  getTrackThumbnail,
+
+  // Progress bar
+  createProgressBar,
 
   // Embed builders
   createNowPlayingEmbed,
@@ -473,12 +493,11 @@ module.exports = {
   validateQueue,
   validateDownloadSource,
 
-  // Options
-  getPlayNodeOptions,
+  // Kazagumo access for commands
+  getKazagumo,
+  getPlayer,
+  getQueue,
 
-  // Re-exports for convenience
-  useMainPlayer,
-  QueryType,
-  QueueRepeatMode,
+  // Logger
   logger,
 };

@@ -1,17 +1,13 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const {
   formatDurationMs,
-  formatRepeatMode,
   getSourceIcon,
   createNowPlayingEmbed,
   showTrackSelection,
   getDeezerTrackInfo,
   extractDeezerID,
   validateVoiceChannel,
-  validateQueue,
-  useMainPlayer,
-  QueryType,
-  getPlayNodeOptions,
+  getKazagumo,
   logger,
 } = require('../music/helpers');
 
@@ -38,9 +34,9 @@ module.exports = {
     await interaction.deferReply();
 
     try {
-      const player = useMainPlayer();
+      const kazagumo = getKazagumo();
 
-      // --- Deezer URL: fetch track info, then search on YouTube ---
+      // --- Deezer URL: fetch track info, then search on YouTube via Lavalink ---
       if (deezerId) {
         await interaction.editReply({ content: '📻 Obteniendo información de Deezer...' });
         const trackInfo = await getDeezerTrackInfo(deezerId);
@@ -49,9 +45,9 @@ module.exports = {
           content: `🔍 Buscando "${trackInfo.title}" de ${trackInfo.artist} en YouTube...`,
         });
 
-        const searchResult = await player.search(`${trackInfo.artist} - ${trackInfo.title}`, {
-          requestedBy: interaction.user,
-          searchEngine: QueryType.AUTO,
+        const searchResult = await kazagumo.search(`${trackInfo.artist} - ${trackInfo.title}`, {
+          requester: interaction.user,
+          engine: 'youtube',
         });
 
         if (!searchResult || !searchResult.tracks.length) {
@@ -71,19 +67,21 @@ module.exports = {
           components: [],
         });
 
-        const { queue } = await player.play(voiceChannel, track, getPlayNodeOptions(interaction));
+        const player = await kazagumo.play(voiceChannel, track, {
+          requester: interaction.user,
+        });
+        player.data = { channel: interaction.channel };
 
-        if (queue.currentTrack) {
-          const embed = createNowPlayingEmbed(queue, queue.currentTrack);
+        if (player.currentTrack) {
+          const embed = createNowPlayingEmbed(player, player.currentTrack);
           await interaction.editReply({ content: null, embeds: [embed] });
         }
         return;
       }
 
-      // --- Normal search with discord-player (handles YT/Spotify/SC URLs automatically) ---
-      const searchResult = await player.search(query, {
-        requestedBy: interaction.user,
-        searchEngine: QueryType.AUTO,
+      // --- Normal search with Kazagumo (handles YT/Spotify/SC URLs automatically) ---
+      const searchResult = await kazagumo.search(query, {
+        requester: interaction.user,
       });
 
       if (!searchResult || !searchResult.tracks.length) {
@@ -91,21 +89,27 @@ module.exports = {
       }
 
       // If it's a playlist
-      if (searchResult.hasPlaylist()) {
+      if (searchResult.type === 'PLAYLIST') {
         const playlist = searchResult.playlist;
-        const { queue } = await player.play(voiceChannel, searchResult, getPlayNodeOptions(interaction));
+        const player = await kazagumo.play(voiceChannel, searchResult, {
+          requester: interaction.user,
+        });
+        player.data = { channel: interaction.channel };
 
         const embed = new EmbedBuilder()
           .setColor(0x5865F2)
           .setTitle('📑 Lista añadida a la cola')
-          .setDescription(`**[${playlist.title}](${playlist.url})**`)
+          .setDescription(`**[${playlist.name || playlist.title}](${playlist.url || playlist.uri})**`)
           .addFields(
-            { name: '👤 Autor', value: playlist.author?.name || 'Desconocido', inline: true },
-            { name: '🎵 Canciones', value: `${playlist.tracks.length}`, inline: true },
-            { name: '⏱️ Duración', value: playlist.durationFormatted || formatDurationMs(playlist.estimatedDuration), inline: true },
-          )
-          .setThumbnail(playlist.thumbnail)
-          .setTimestamp();
+            { name: '👤 Autor', value: playlist.author || 'Desconocido', inline: true },
+            { name: '🎵 Canciones', value: `${searchResult.tracks.length}`, inline: true },
+            { name: '⏱️ Duración', value: formatDurationMs(playlist.duration || playlist.length || 0), inline: true },
+          );
+
+        if (playlist.thumbnail || playlist.artworkUrl) {
+          embed.setThumbnail(playlist.thumbnail || playlist.artworkUrl);
+        }
+        embed.setTimestamp();
 
         return interaction.editReply({ embeds: [embed] });
       }
@@ -124,10 +128,13 @@ module.exports = {
         components: [],
       });
 
-      const { queue } = await player.play(voiceChannel, track, getPlayNodeOptions(interaction));
+      const player = await kazagumo.play(voiceChannel, track, {
+        requester: interaction.user,
+      });
+      player.data = { channel: interaction.channel };
 
-      if (queue.currentTrack) {
-        const embed = createNowPlayingEmbed(queue, queue.currentTrack);
+      if (player.currentTrack) {
+        const embed = createNowPlayingEmbed(player, player.currentTrack);
         await interaction.editReply({ content: null, embeds: [embed] });
       }
 
@@ -136,6 +143,8 @@ module.exports = {
       let errorMsg = `❌ Error al reproducir: ${error.message}`;
       if (error.message?.toLowerCase().includes('ffmpeg') || error.message?.toLowerCase().includes('encoder')) {
         errorMsg = '❌ FFmpeg no está instalado. Asegúrate de que ffmpeg esté disponible en el sistema.';
+      } else if (error.message?.includes('connect') || error.message?.includes('ECONNREFUSED')) {
+        errorMsg = '❌ No se pudo conectar al servidor Lavalink. Asegúrate de que esté ejecutándose.';
       }
       try { await interaction.editReply({ content: errorMsg }); }
       catch { await interaction.followUp({ content: errorMsg, ephemeral: true }); }
