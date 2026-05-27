@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { useMainPlayer, QueryType, QueueRepeatMode } = require('discord-player');
 const { getQueue } = require('../music/player');
 const logger = require('../utils/logger');
@@ -407,12 +407,49 @@ async function handlePlay(interaction) {
       return interaction.editReply({ embeds: [embed] });
     }
 
-    // Single track
-    const track = searchResult.tracks[0];
-    const replyText = `${getSourceIcon(track)} **${track.title}** - *${track.author}*`
-      + (searchResult.tracks.length > 1 ? `\n📋 Se encontraron ${searchResult.tracks.length} resultados. Reproduciendo el primero.` : '');
+    // --- Track selection UI if multiple results ---
+    let track = searchResult.tracks[0];
 
-    await interaction.editReply({ content: replyText });
+    if (searchResult.tracks.length > 1) {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('music_track_select')
+        .setPlaceholder('🎯 Selecciona la canción correcta')
+        .addOptions(
+          searchResult.tracks.slice(0, 5).map((t, i) => ({
+            label: (t.title || 'Desconocido').substring(0, 100),
+            description: `${(t.author || 'Desconocido').substring(0, 50)} — ${formatDuration(t.durationMS)}`,
+            value: String(i),
+          }))
+        );
+
+      const row = new ActionRowBuilder().addComponents(select);
+
+      const message = await interaction.editReply({
+        content: `🔍 Se encontraron ${searchResult.tracks.length} resultados. **Selecciona el correcto** (30s):`,
+        components: [row],
+      });
+
+      try {
+        const collected = await message.awaitMessageComponent({
+          filter: i => i.user.id === interaction.user.id,
+          time: 30000,
+        });
+        const selectedIndex = parseInt(collected.values[0]);
+        track = searchResult.tracks[selectedIndex];
+        await collected.update({ components: [] });
+      } catch {
+        await interaction.editReply({
+          content: '⏰ Tiempo agotado. Usa `/music play` de nuevo.',
+          components: [],
+        });
+        return;
+      }
+    }
+
+    await interaction.editReply({
+      content: `${getSourceIcon(track)} **${track.title}** - *${track.author}*`,
+      components: [],
+    });
 
     const { queue } = await player.play(voiceChannel, track, {
       nodeOptions: {

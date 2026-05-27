@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
 const { json } = require('@distube/yt-dlp');
 const axios = require('axios');
 const logger = require('../utils/logger');
@@ -54,10 +54,10 @@ async function getSpotifyTrackInfo(spotifyUrl) {
 }
 
 /**
- * Searches YouTube using yt-dlp's built-in search
+ * Searches YouTube using yt-dlp's built-in search, returns up to 5 results
  */
 async function searchYouTube(query) {
-  const result = await json(`ytsearch10:${query}`, {
+  const result = await json(`ytsearch5:${query}`, {
     ...YTDLP_FLAGS,
     flatPlaylist: false,
   });
@@ -66,7 +66,6 @@ async function searchYouTube(query) {
     throw new Error('No se encontraron resultados en YouTube');
   }
 
-  // Filter only video entries with valid URLs
   const videos = result.entries.filter(
     e => e && e.webpage_url && e.title && e.duration > 0
   );
@@ -75,14 +74,14 @@ async function searchYouTube(query) {
     throw new Error('No se encontraron videos en YouTube');
   }
 
-  return videos[0];
+  return videos.slice(0, 5);
 }
 
 /**
- * Searches SoundCloud using yt-dlp's built-in search
+ * Searches SoundCloud using yt-dlp's built-in search, returns up to 5 results
  */
 async function searchSoundCloud(query) {
-  const result = await json(`scsearch10:${query}`, {
+  const result = await json(`scsearch5:${query}`, {
     ...YTDLP_FLAGS,
     flatPlaylist: false,
   });
@@ -99,7 +98,7 @@ async function searchSoundCloud(query) {
     throw new Error('No se encontraron tracks en SoundCloud');
   }
 
-  return tracks[0];
+  return tracks.slice(0, 5);
 }
 
 /**
@@ -130,6 +129,49 @@ async function getDownloadURL(mediaUrl, format = 'ba/ba*') {
     uploaderUrl: info.uploader_url || info.channel_url || '',
     thumbnail: info.thumbnail || info.thumbnails?.[0]?.url || '',
   };
+}
+
+/**
+ * Shows a select menu with search results and returns the selected item.
+ * If only 1 result, returns it directly without showing the menu.
+ */
+async function showTrackSelection(interaction, tracks) {
+  if (!tracks || tracks.length === 0) return null;
+  if (tracks.length === 1) return tracks[0];
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId('track_select')
+    .setPlaceholder('🎯 Selecciona el resultado correcto')
+    .addOptions(
+      tracks.map((track, i) => ({
+        label: (track.title || 'Desconocido').substring(0, 100),
+        description: `${(track.uploader || track.channel || 'Desconocido').substring(0, 50)} — ${formatDuration(track.duration || 0)}`,
+        value: String(i),
+      }))
+    );
+
+  const row = new ActionRowBuilder().addComponents(select);
+
+  const message = await interaction.editReply({
+    content: `🔍 Se encontraron ${tracks.length} resultados. **Selecciona el correcto** (30s):`,
+    components: [row],
+  });
+
+  try {
+    const collected = await message.awaitMessageComponent({
+      filter: i => i.user.id === interaction.user.id,
+      time: 30000,
+    });
+    const selectedIndex = parseInt(collected.values[0]);
+    await collected.update({ components: [] });
+    return tracks[selectedIndex];
+  } catch {
+    await interaction.editReply({
+      content: '⏰ Tiempo agotado. Usa `/play` de nuevo.',
+      components: [],
+    });
+    return null;
+  }
 }
 
 /**
@@ -227,18 +269,19 @@ module.exports = {
         await interaction.editReply({ content: '🎵 Obteniendo información de Spotify...' });
 
         const trackInfo = await getSpotifyTrackInfo(`https://open.spotify.com/track/${spotifyTrackId}`);
-        const searchQuery = `${trackInfo.title} ${trackInfo.artist}`;
 
         await interaction.editReply({
           content: `🔍 Buscando "${trackInfo.title}" de ${trackInfo.artist} en YouTube...`,
         });
 
-        const video = await searchYouTube(searchQuery);
-        mediaUrl = video.webpage_url;
+        const videos = await searchYouTube(`${trackInfo.artist} - ${trackInfo.title}`);
+        const selected = await showTrackSelection(interaction, videos);
+        if (!selected) return;
+        mediaUrl = selected.webpage_url;
         mediaTitle = `${trackInfo.title} — ${trackInfo.artist}`;
-        uploader = video.uploader || video.channel || 'Desconocido';
-        duration = video.duration || 0;
-        thumbnail = trackInfo.thumbnail || video.thumbnail || video.thumbnails?.[0]?.url || '';
+        uploader = selected.uploader || selected.channel || 'Desconocido';
+        duration = selected.duration || 0;
+        thumbnail = trackInfo.thumbnail || selected.thumbnail || selected.thumbnails?.[0]?.url || '';
       }
 
       // --- Case 2: SoundCloud URL or fuente=soundcloud ---
@@ -257,12 +300,14 @@ module.exports = {
         } else {
           // Search SoundCloud
           await interaction.editReply({ content: `☁️ Buscando "${query}" en SoundCloud...` });
-          const track = await searchSoundCloud(query);
-          mediaUrl = track.webpage_url;
-          mediaTitle = track.title;
-          uploader = track.uploader || track.channel || 'Desconocido';
-          duration = track.duration || 0;
-          thumbnail = track.thumbnail || track.thumbnails?.[0]?.url || '';
+          const tracks = await searchSoundCloud(query);
+          const selected = await showTrackSelection(interaction, tracks);
+          if (!selected) return;
+          mediaUrl = selected.webpage_url;
+          mediaTitle = selected.title;
+          uploader = selected.uploader || selected.channel || 'Desconocido';
+          duration = selected.duration || 0;
+          thumbnail = selected.thumbnail || selected.thumbnails?.[0]?.url || '';
         }
       }
 
@@ -282,12 +327,14 @@ module.exports = {
         } else {
           // Search YouTube
           await interaction.editReply({ content: `🔍 Buscando "${query}" en YouTube...` });
-          const video = await searchYouTube(query);
-          mediaUrl = video.webpage_url;
-          mediaTitle = video.title;
-          uploader = video.uploader || video.channel || 'Desconocido';
-          duration = video.duration || 0;
-          thumbnail = video.thumbnail || video.thumbnails?.[0]?.url || '';
+          const videos = await searchYouTube(query);
+          const selected = await showTrackSelection(interaction, videos);
+          if (!selected) return;
+          mediaUrl = selected.webpage_url;
+          mediaTitle = selected.title;
+          uploader = selected.uploader || selected.channel || 'Desconocido';
+          duration = selected.duration || 0;
+          thumbnail = selected.thumbnail || selected.thumbnails?.[0]?.url || '';
         }
       }
 
