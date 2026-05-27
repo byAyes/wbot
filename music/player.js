@@ -1,6 +1,6 @@
 const { Kazagumo } = require('kazagumo');
 const { Connectors } = require('shoukaku');
-const { KazagumoFilter } = require('kazagumo-filter');
+const KazagumoFilter = require('kazagumo-filter');
 const logger = require('../utils/logger');
 
 let kazagumo = null;
