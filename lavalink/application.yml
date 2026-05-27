@@ -11,6 +11,7 @@ lavalink:
     - dependency: "dev.lavalink.youtube:youtube-plugin:1.8.2"
       snapshot: false
   server:
+    password: "youshallnotpass"
     sources:
       youtube: false        # Disable built-in YouTube (use plugin instead)
       bandcamp: true
