@@ -1,6 +1,9 @@
 const { Kazagumo } = require('kazagumo');
 const { Connectors } = require('shoukaku');
 const KazagumoFilter = require('kazagumo-filter');
+const { exec } = require('child_process');
+const net = require('net');
+const path = require('path');
 const logger = require('../utils/logger');
 
 let kazagumo = null;
@@ -35,6 +38,103 @@ function getLavalinkNodes() {
   return nodes;
 }
 
+// ========== LAVALINK AUTO-START ==========
+
+const LAVALINK_DIR = path.join(__dirname, '..', 'lavalink');
+const LAVALINK_PORT = 2333;
+const LAVALINK_HOST = process.env.LAVALINK_HOST || 'localhost';
+const DOCKER_COMPOSE_MAX_WAIT = 60000; // 60 seconds max wait
+const DOCKER_COMPOSE_POLL_INTERVAL = 2000; // Poll every 2 seconds
+
+/**
+ * Checks if a port is open (Lavalink is ready)
+ */
+function isPortOpen(host, port, timeout = 3000) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(timeout);
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host);
+  });
+}
+
+/**
+ * Runs a shell command and returns stdout
+ */
+function runCommand(cmd, cwd) {
+  return new Promise((resolve) => {
+    exec(cmd, { cwd, timeout: 15000 }, (error, stdout) => {
+      resolve({ stdout: (stdout || '').trim(), error });
+    });
+  });
+}
+
+/**
+ * Automatically starts Lavalink via Docker Compose if it's not already running.
+ * Logs warnings if Docker is not available — does NOT crash the bot.
+ */
+async function startLavalink() {
+  // Step 1: Check if Lavalink is already reachable
+  const alreadyRunning = await isPortOpen(
+    LAVALINK_HOST === 'localhost' ? '127.0.0.1' : LAVALINK_HOST,
+    LAVALINK_PORT,
+  );
+  if (alreadyRunning) {
+    logger.info('Lavalink ya está corriendo. Omitiendo auto-inicio.');
+    return true;
+  }
+
+  // Step 2: Check if Docker Compose is available
+  const dockerCheck = await runCommand('docker compose version', LAVALINK_DIR);
+  if (dockerCheck.error) {
+    logger.warn(
+      'Docker Compose no está disponible. Asegúrate de que Lavalink esté corriendo manualmente en localhost:2333.',
+    );
+    return false;
+  }
+
+  logger.info('Iniciando Lavalink con Docker Compose...');
+
+  // Step 3: Start Lavalink with docker compose up -d
+  const startResult = await runCommand('docker compose up -d', LAVALINK_DIR);
+  if (startResult.error) {
+    logger.error('Error al iniciar Lavalink con Docker Compose:', startResult.error.message);
+    return false;
+  }
+
+  logger.info('Esperando a que Lavalink esté listo...');
+
+  // Step 4: Wait for Lavalink to be ready (poll port)
+  const startTime = Date.now();
+  while (Date.now() - startTime < DOCKER_COMPOSE_MAX_WAIT) {
+    const ready = await isPortOpen('127.0.0.1', LAVALINK_PORT);
+    if (ready) {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      logger.success(`Lavalink listo después de ${elapsed}s`);
+      return true;
+    }
+    await new Promise(r => setTimeout(r, DOCKER_COMPOSE_POLL_INTERVAL));
+  }
+
+  logger.error(
+    `Lavalink no respondió después de ${DOCKER_COMPOSE_MAX_WAIT / 1000}s. Verifica el estado con "docker compose ps".`,
+  );
+  return false;
+}
+
+// ========== KAZAGUMO INIT ==========
+
 /**
  * Initializes the Kazagumo/Lavalink music system
  * @param {import('discord.js').Client} client - The Discord client
@@ -44,6 +144,9 @@ async function initPlayer(client) {
   if (kazagumo) return kazagumo;
 
   logger.info('Inicializando sistema de música Kazagumo + Lavalink...');
+
+  // Auto-start Lavalink if needed
+  await startLavalink();
 
   const lavalinkNodes = getLavalinkNodes();
 
