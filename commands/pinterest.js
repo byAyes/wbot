@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { apiCall } = require('../utils/api');
 const logger = require('../utils/logger');
 
@@ -21,7 +21,7 @@ module.exports = {
     if (!process.env.API_URL || !process.env.API_KEY) {
       return await interaction.reply({
         content: '❌ Las APIs de descarga no están configuradas. Revisa tu archivo .env.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 

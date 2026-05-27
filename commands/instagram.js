@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -27,7 +27,7 @@ module.exports = {
     if (!process.env.ALTERNATIVE_API_URL) {
       return await interaction.reply({
         content: '❌ ALTERNATIVE_API_URL no está configurado. Revisa tu archivo .env.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const {
   formatDurationMs,
   getSourceIcon,
@@ -25,7 +25,7 @@ module.exports = {
   async execute(interaction) {
     const voiceCheck = validateVoiceChannel(interaction);
     if (!voiceCheck.valid) {
-      return interaction.reply({ content: voiceCheck.error, ephemeral: true });
+      return interaction.reply({ content: voiceCheck.error, flags: MessageFlags.Ephemeral });
     }
     const { channel: voiceChannel } = voiceCheck;
     const query = interaction.options.getString('query');
@@ -147,7 +147,7 @@ module.exports = {
         errorMsg = '❌ No se pudo conectar al servidor Lavalink. Asegúrate de que esté ejecutándose.';
       }
       try { await interaction.editReply({ content: errorMsg }); }
-      catch { await interaction.followUp({ content: errorMsg, ephemeral: true }); }
+      catch { await interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral }); }
     }
   },
 };

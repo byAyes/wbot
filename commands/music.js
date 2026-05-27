@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
 const axios = require('axios');
 const {
   // Constants
@@ -238,7 +238,7 @@ module.exports = {
       case 'filters': return handleFilters(interaction);
       case 'clear': return handleClear(interaction);
       default:
-        return interaction.reply({ content: '❌ Subcomando no válido.', ephemeral: true });
+        return interaction.reply({ content: '❌ Subcomando no válido.', flags: MessageFlags.Ephemeral });
     }
   },
 };
@@ -257,7 +257,7 @@ async function handleDownload(interaction) {
   // --- Pre-validate ---
   const sourceCheck = validateDownloadSource(query, formato, fuente, fuenteExplicit);
   if (!sourceCheck.valid) {
-    return interaction.reply({ content: sourceCheck.error, ephemeral: true });
+    return interaction.reply({ content: sourceCheck.error, flags: MessageFlags.Ephemeral });
   }
   const { deezerTrackId, spotifyTrackId, isSoundCloud, isYouTubeUrl } = sourceCheck;
 
@@ -440,7 +440,7 @@ async function handleDownload(interaction) {
 
 async function handleSkip(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const currentTrack = player.currentTrack;
@@ -456,7 +456,7 @@ async function handleSkip(interaction) {
 
 async function handleStop(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   player.destroy();
@@ -471,11 +471,11 @@ async function handleStop(interaction) {
 
 async function handlePause(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   if (player.paused) {
-    return interaction.reply({ content: '⚠️ Ya está pausada. Usa `/music resume`.', ephemeral: true });
+    return interaction.reply({ content: '⚠️ Ya está pausada. Usa `/music resume`.', flags: MessageFlags.Ephemeral });
   }
 
   player.pause();
@@ -490,11 +490,11 @@ async function handlePause(interaction) {
 
 async function handleResume(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   if (!player.paused) {
-    return interaction.reply({ content: '⚠️ No está pausada.', ephemeral: true });
+    return interaction.reply({ content: '⚠️ No está pausada.', flags: MessageFlags.Ephemeral });
   }
 
   player.resume();
@@ -513,7 +513,7 @@ async function handleResume(interaction) {
 
 async function handleNowPlaying(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const embed = createNowPlayingEmbed(player, player.currentTrack);
@@ -522,7 +522,7 @@ async function handleNowPlaying(interaction) {
 
 async function handleQueue(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const embed = createQueueEmbed(player);
@@ -535,7 +535,7 @@ async function handleQueue(interaction) {
 
 async function handleVolume(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const volume = interaction.options.getInteger('nivel');
@@ -551,7 +551,7 @@ async function handleVolume(interaction) {
 
 async function handleShuffle(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   // Store shuffle state on player data
@@ -577,7 +577,7 @@ async function handleShuffle(interaction) {
 
 async function handleLoop(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const mode = interaction.options.getString('modo');
@@ -610,7 +610,7 @@ async function handleLoop(interaction) {
 
 async function handleRemove(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const trackNumber = interaction.options.getInteger('numero');
@@ -619,7 +619,7 @@ async function handleRemove(interaction) {
   if (trackNumber > queueSize) {
     return interaction.reply({
       content: `❌ El número **${trackNumber}** no es válido. La cola solo tiene **${queueSize}** canciones.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -636,7 +636,7 @@ async function handleRemove(interaction) {
 
 async function handleMove(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const from = interaction.options.getInteger('desde');
@@ -646,14 +646,14 @@ async function handleMove(interaction) {
   if (from > tracks.length) {
     return interaction.reply({
       content: `❌ La posición **${from}** no es válida. La cola solo tiene **${tracks.length}** canciones.`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
   if (to > tracks.length) {
     return interaction.reply({
       content: `❌ La posición **${to}** está fuera del rango (máximo ${tracks.length}).`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -680,7 +680,7 @@ async function handleMove(interaction) {
 
 async function handleSeek(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const targetSeconds = interaction.options.getInteger('segundos');
@@ -690,7 +690,7 @@ async function handleSeek(interaction) {
   if (targetMs > trackDuration) {
     return interaction.reply({
       content: `❌ El tiempo máximo es ${formatDurationMs(trackDuration)} (${Math.floor(trackDuration / 1000)}s).`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -710,12 +710,12 @@ async function handleSeek(interaction) {
 
 async function handleLyrics(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const track = player.currentTrack;
   if (!track) {
-    return interaction.reply({ content: '❌ No hay canción reproduciéndose.', ephemeral: true });
+    return interaction.reply({ content: '❌ No hay canción reproduciéndose.', flags: MessageFlags.Ephemeral });
   }
 
   await interaction.deferReply();
@@ -769,7 +769,7 @@ async function handleLyrics(interaction) {
 
 async function handleFilters(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const filterName = interaction.options.getString('filtro');
@@ -777,7 +777,7 @@ async function handleFilters(interaction) {
   if (!player.filterManager) {
     return interaction.reply({
       content: '❌ El sistema de filtros no está disponible.',
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -801,7 +801,7 @@ async function handleFilters(interaction) {
     logger.error('Error aplicando filtro:', error);
     return interaction.reply({
       content: `❌ Error al aplicar el filtro: ${error.message}`,
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
@@ -812,7 +812,7 @@ async function handleFilters(interaction) {
 
 async function handleClear(interaction) {
   const queueCheck = validateQueue(interaction);
-  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, ephemeral: true });
+  if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
   const trackCount = player.queue.length;
