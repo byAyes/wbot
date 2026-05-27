@@ -44,8 +44,14 @@ function getLavalinkNodes() {
 const LAVALINK_DIR = path.join(__dirname, '..', 'lavalink');
 const LAVALINK_PORT = 2333;
 const LAVALINK_HOST = process.env.LAVALINK_HOST || 'localhost';
-const DOCKER_COMPOSE_MAX_WAIT = 60000; // 60 seconds max wait
+const DOCKER_COMPOSE_MAX_WAIT = 120000; // 2 minutes max wait (includes Docker Desktop startup)
+const DOCKER_DAEMON_WAIT = 120000; // 2 minutes to wait for Docker daemon
 const DOCKER_COMPOSE_POLL_INTERVAL = 2000; // Poll every 2 seconds
+
+const DOCKER_DESKTOP_PATHS = [
+  'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe',
+  path.join(process.env.LOCALAPPDATA || '', 'Docker', 'Docker Desktop.exe'),
+];
 
 /**
  * Checks if a port is open (Lavalink is ready)
@@ -104,8 +110,65 @@ function findDockerPath() {
 }
 
 /**
+ * Finds the Docker Desktop executable path.
+ */
+function findDockerDesktopPath() {
+  for (const p of DOCKER_DESKTOP_PATHS) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return null;
+}
+
+/**
+ * Spawns Docker Desktop and waits for the daemon to become ready.
+ */
+function startDockerDaemon(dockerBin) {
+  return new Promise((resolve) => {
+    const ddPath = findDockerDesktopPath();
+    if (!ddPath) {
+      logger.warn('Docker Desktop no encontrado. Inícialo manualmente.');
+      return resolve(false);
+    }
+
+    logger.info('Iniciando Docker Desktop automáticamente...');
+
+    // Launch Docker Desktop (detached — we don't wait for the process)
+    const proc = exec(`"${ddPath}"`, (err) => {
+      if (err && err.code !== 0) {
+        // Docker Desktop may already be launching; that's fine
+        logger.debug(`Docker Desktop launch: ${err.message}`);
+      }
+    });
+    proc.unref(); // Don't keep the bot alive just for this process
+
+    // Poll until daemon is ready
+    const startTime = Date.now();
+    const poll = setInterval(async () => {
+      const result = await runCommand(`${dockerBin} info`, LAVALINK_DIR);
+      if (!result.error) {
+        clearInterval(poll);
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        logger.success(`Docker Desktop listo después de ${elapsed}s`);
+        resolve(true);
+        return;
+      }
+
+      if (Date.now() - startTime > DOCKER_DAEMON_WAIT) {
+        clearInterval(poll);
+        logger.warn(`Docker Desktop no respondió después de ${DOCKER_DAEMON_WAIT / 1000}s.`);
+        logger.warn('Ábrelo manualmente: Inicio > Docker Desktop');
+        resolve(false);
+      }
+    }, DOCKER_COMPOSE_POLL_INTERVAL);
+  });
+}
+
+/**
  * Automatically starts Lavalink via Docker Compose if it's not already running.
- * Handles Windows Docker Desktop paths and missing daemon gracefully.
+ * Handles everything: starts Docker Desktop if needed, then Lavalink.
+ * The user only needs to run the bot — no manual steps.
  */
 async function startLavalink() {
   // Step 1: Check if Lavalink is already reachable
@@ -122,31 +185,32 @@ async function startLavalink() {
   const dockerDir = findDockerPath();
   const dockerBin = dockerDir ? `"${dockerDir}docker.exe"` : 'docker';
 
-  logger.info('Buscando Docker...');
+  logger.info('Verificando Docker...');
   const versionCheck = await runCommand(`${dockerBin} version --format "{{.Client.Version}}"`, LAVALINK_DIR);
   if (versionCheck.error) {
     logger.warn(
-      'Docker no está disponible. Asegúrate de que Lavalink esté corriendo en localhost:2333 o instala Docker Desktop.',
+      'Docker no está instalado. El sistema de música no estará disponible sin Lavalink.',
     );
-    logger.warn('Descarga Docker Desktop: https://www.docker.com/products/docker-desktop/');
+    logger.info('Descarga Docker Desktop desde: https://www.docker.com/products/docker-desktop/');
     return false;
   }
 
-  logger.info(`Docker detectado (v${versionCheck.stdout || '?'}). Verificando daemon...`);
+  logger.info(`Docker v${versionCheck.stdout || '?'} detectado.`);
 
-  // Step 3: Check if Docker daemon is running
+  // Step 3: Check if Docker daemon is running — if not, auto-start Docker Desktop
   const daemonCheck = await runCommand(`${dockerBin} info`, LAVALINK_DIR);
   if (daemonCheck.error) {
-    logger.warn('Docker Desktop está instalado pero el daemon NO está corriendo.');
-    logger.warn('Ábrelo manualmente: Inicio > Docker Desktop o desde el icono en la bandeja del sistema.');
-    logger.warn('También puedes usar: "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"');
-    return false;
+    logger.info('El daemon de Docker no está corriendo. Intentando iniciar Docker Desktop...');
+    const started = await startDockerDaemon(dockerBin);
+    if (!started) {
+      return false;
+    }
   }
 
   // Step 4: Check if compose plugin is available
   const composeCheck = await runCommand(`${dockerBin} compose version`, LAVALINK_DIR);
   if (composeCheck.error) {
-    logger.warn('Docker está disponible pero Docker Compose no. Usa una versión reciente de Docker Desktop.');
+    logger.warn('Docker Compose no está disponible. Actualiza Docker Desktop.');
     return false;
   }
 
@@ -161,7 +225,7 @@ async function startLavalink() {
 
   logger.info('Esperando a que Lavalink esté listo...');
 
-  // Step 6: Wait for Lavalink to be ready (poll port)
+  // Step 6: Wait for Lavalink to be ready (poll port 2333)
   const startTime = Date.now();
   while (Date.now() - startTime < DOCKER_COMPOSE_MAX_WAIT) {
     const ready = await isPortOpen('127.0.0.1', LAVALINK_PORT);
@@ -178,8 +242,7 @@ async function startLavalink() {
   logger.error(
     `Lavalink no respondió después de ${DOCKER_COMPOSE_MAX_WAIT / 1000}s.
 ` +
-    `Últimos logs:\n${logs.stdout || logs.stderr || '(sin logs)'}\n` +
-    `Verifica el estado con: cd lavalink && docker compose ps`,
+    `Últimos logs:\n${logs.stdout || logs.stderr || '(sin logs)'}\n`,
   );
   return false;
 }
