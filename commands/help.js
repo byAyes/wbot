@@ -12,22 +12,29 @@ module.exports = {
       .setDescription('Bot multimedia con descargas y utilidades')
       .addFields(
         {
-          name: '🎵 Sistema de Música (/play)',
+          name: '🎵 Reproducir (/play)',
           value:
-            '`/play play <query>` - Reproduce en voz (YT/Spotify/SC/Deezer)\n' +
-            '`/play download <q> [fmt] [src]` - Descarga archivo\n' +
-            '`/play skip` / `stop` / `pause` / `resume`\n' +
-            '`/play nowplaying` - Canción actual\n' +
-            '`/play queue` - Cola de reproducción\n' +
-            '`/play volume <1-100>` - Volumen\n' +
-            '`/play shuffle` - Modo aleatorio\n' +
-            '`/play loop <off/track/queue/autoplay>`\n' +
-            '`/play remove <#>` - Quitar canción de la cola\n' +
-            '`/play move <desde> <hasta>` - Reordenar\n' +
-            '`/play seek <segundos>` - Adelantar/retroceder\n' +
-            '`/play lyrics` - Letra de la canción actual\n' +
-            '`/play filters <filtro>` - Efectos de audio (20)\n' +
-            '`/play clear` - Limpiar la cola',
+            '`/play <query>` - Reproduce música en voz\n' +
+            '  (YouTube, Spotify, SoundCloud, Deezer)\n' +
+            '  Si pegas una URL, la detecta automáticamente.',
+          inline: false,
+        },
+        {
+          name: '🎛️ Control de música (/music)',
+          value:
+            '`/music download <q> [fmt]` - Descarga archivo\n' +
+            '`/music skip` / `stop` / `pause` / `resume`\n' +
+            '`/music nowplaying` - Canción actual\n' +
+            '`/music queue` - Cola de reproducción\n' +
+            '`/music volume <1-100>` - Volumen\n' +
+            '`/music shuffle` - Modo aleatorio\n' +
+            '`/music loop <off/track/queue/autoplay>`\n' +
+            '`/music remove <#>` - Quitar canción de la cola\n' +
+            '`/music move <desde> <hasta>` - Reordenar\n' +
+            '`/music seek <segundos>` - Adelantar/retroceder\n' +
+            '`/music lyrics` - Letra de la canción actual\n' +
+            '`/music filters <filtro>` - Efectos de audio (20)\n' +
+            '`/music clear` - Limpiar la cola',
           inline: false,
         },
         {

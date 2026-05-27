@@ -3,17 +3,19 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const logger = require('./utils/logger');
 
 const commands = [
-  // --- Play (Music System - replaces old /play + /music) ---
+  // --- Play (simple: reproduce música) ---
   new SlashCommandBuilder()
     .setName('play')
-    .setDescription('🎵 Reproduce música, descarga audio/video y administra la cola')
-    .addSubcommand(sub =>
-      sub.setName('play')
-        .setDescription('Reproduce música en tu canal de voz (YouTube, Spotify, SoundCloud, Deezer)')
-        .addStringOption(option =>
-          option.setName('query')
-            .setDescription('Nombre de la canción o URL')
-            .setRequired(true)))
+    .setDescription('🎵 Reproduce música en tu canal de voz (YouTube, Spotify, SoundCloud, Deezer)')
+    .addStringOption(option =>
+      option.setName('query')
+        .setDescription('Nombre de la canción o URL (YouTube/Spotify/SoundCloud/Deezer)')
+        .setRequired(true)),
+
+  // --- Music (control + download) ---
+  new SlashCommandBuilder()
+    .setName('music')
+    .setDescription('🎛️ Controla la reproducción, descarga música y administra la cola')
     .addSubcommand(sub =>
       sub.setName('download')
         .setDescription('Descarga audio/video de YouTube, SoundCloud, Spotify o Deezer')
@@ -23,7 +25,7 @@ const commands = [
             .setRequired(true))
         .addStringOption(option =>
           option.setName('formato')
-            .setDescription('Formato de descarga')
+            .setDescription('Formato de descarga (por defecto: audio)')
             .setRequired(false)
             .addChoices(
               { name: 'Audio (MP3)', value: 'audio' },
@@ -31,7 +33,7 @@ const commands = [
             ))
         .addStringOption(option =>
           option.setName('fuente')
-            .setDescription('Fuente de búsqueda (se auto-detecta si es URL)')
+            .setDescription('Fuente (se auto-detecta si es URL)')
             .setRequired(false)
             .addChoices(
               { name: 'YouTube', value: 'youtube' },
@@ -39,50 +41,50 @@ const commands = [
             )))
     .addSubcommand(sub =>
       sub.setName('skip')
-        .setDescription('Saltar a la siguiente canción'))
+        .setDescription('⏭️ Salta a la siguiente canción'))
     .addSubcommand(sub =>
       sub.setName('stop')
-        .setDescription('Detiene la música y sale del canal'))
+        .setDescription('🛑 Detiene la música, limpia la cola y sale del canal'))
     .addSubcommand(sub =>
       sub.setName('pause')
-        .setDescription('Pausa la reproducción'))
+        .setDescription('⏸️ Pausa la reproducción actual'))
     .addSubcommand(sub =>
       sub.setName('resume')
-        .setDescription('Reanuda la reproducción'))
+        .setDescription('▶️ Reanuda la reproducción pausada'))
     .addSubcommand(sub =>
       sub.setName('nowplaying')
-        .setDescription('Muestra la canción actual'))
+        .setDescription('📌 Muestra la canción que se está reproduciendo'))
     .addSubcommand(sub =>
       sub.setName('queue')
-        .setDescription('Muestra la cola de reproducción'))
+        .setDescription('📋 Muestra la cola de reproducción actual'))
     .addSubcommand(sub =>
       sub.setName('volume')
-        .setDescription('Ajusta el volumen (1-100)')
+        .setDescription('🔊 Ajusta el volumen (1-100)')
         .addIntegerOption(option =>
           option.setName('nivel')
-            .setDescription('Nivel de volumen')
+            .setDescription('Nivel de volumen (1-100)')
             .setRequired(true)
             .setMinValue(1)
             .setMaxValue(100)))
     .addSubcommand(sub =>
       sub.setName('shuffle')
-        .setDescription('Activa/desactiva el modo aleatorio'))
+        .setDescription('🔀 Activa/desactiva el modo aleatorio'))
     .addSubcommand(sub =>
       sub.setName('loop')
-        .setDescription('Cambia el modo de repetición')
+        .setDescription('🔁 Cambia el modo de repetición')
         .addStringOption(option =>
           option.setName('modo')
             .setDescription('Modo de repetición')
             .setRequired(true)
             .addChoices(
-              { name: 'Desactivado', value: 'off' },
-              { name: 'Repetir canción', value: 'track' },
-              { name: 'Repetir cola', value: 'queue' },
-              { name: 'Autoplay', value: 'autoplay' },
+              { name: '❌ Desactivado', value: 'off' },
+              { name: '🔂 Repetir canción', value: 'track' },
+              { name: '🔁 Repetir cola', value: 'queue' },
+              { name: '♾️ Autoplay', value: 'autoplay' },
             )))
     .addSubcommand(sub =>
       sub.setName('remove')
-        .setDescription('Elimina una canción de la cola')
+        .setDescription('🗑️ Elimina una canción de la cola por su número')
         .addIntegerOption(option =>
           option.setName('numero')
             .setDescription('Número de la canción en la cola')
@@ -90,10 +92,10 @@ const commands = [
             .setMinValue(1)))
     .addSubcommand(sub =>
       sub.setName('move')
-        .setDescription('Mueve una canción a otra posición')
+        .setDescription('📦 Mueve una canción a otra posición en la cola')
         .addIntegerOption(option =>
           option.setName('desde')
-            .setDescription('Posición actual')
+            .setDescription('Número actual de la canción')
             .setRequired(true)
             .setMinValue(1))
         .addIntegerOption(option =>
@@ -103,7 +105,7 @@ const commands = [
             .setMinValue(1)))
     .addSubcommand(sub =>
       sub.setName('seek')
-        .setDescription('Adelanta/retrocede a un punto de la canción')
+        .setDescription('⏩ Adelanta/retrocede a un punto específico de la canción')
         .addIntegerOption(option =>
           option.setName('segundos')
             .setDescription('Posición en segundos')
@@ -111,39 +113,39 @@ const commands = [
             .setMinValue(0)))
     .addSubcommand(sub =>
       sub.setName('lyrics')
-        .setDescription('Muestra la letra de la canción actual'))
+        .setDescription('📝 Muestra la letra de la canción actual'))
     .addSubcommand(sub =>
       sub.setName('filters')
-        .setDescription('Activa o desactiva filtros de audio')
+        .setDescription('🎛️ Activa o desactiva filtros de audio')
         .addStringOption(option =>
           option.setName('filtro')
             .setDescription('Filtro a aplicar')
             .setRequired(true)
             .addChoices(
-              { name: 'Bass Boost (Bajo)', value: 'bassboost_low' },
-              { name: 'Bass Boost', value: 'bassboost' },
-              { name: 'Bass Boost (Alto)', value: 'bassboost_high' },
-              { name: '8D', value: '8D' },
-              { name: 'Vaporwave', value: 'vaporwave' },
-              { name: 'Nightcore', value: 'nightcore' },
-              { name: 'Phaser', value: 'phaser' },
-              { name: 'Tremolo', value: 'tremolo' },
-              { name: 'Vibrato', value: 'vibrato' },
-              { name: 'Reverse', value: 'reverse' },
-              { name: 'Treble', value: 'treble' },
-              { name: 'Normalizer', value: 'normalizer' },
-              { name: 'Karaoke', value: 'karaoke' },
-              { name: 'Flanger', value: 'flanger' },
-              { name: 'Compresor', value: 'compressor' },
-              { name: 'Lo-Fi', value: 'lofi' },
-              { name: 'Earrape', value: 'earrape' },
-              { name: 'Surround', value: 'surrounding' },
-              { name: 'Sub Boost', value: 'subboost' },
-              { name: 'Mono', value: 'mono' },
+              { name: '🎵 Bass Boost (Bajo)', value: 'bassboost_low' },
+              { name: '🎵 Bass Boost', value: 'bassboost' },
+              { name: '🎵 Bass Boost (Alto)', value: 'bassboost_high' },
+              { name: '🌀 8D', value: '8D' },
+              { name: '🌊 Vaporwave', value: 'vaporwave' },
+              { name: '⚡ Nightcore', value: 'nightcore' },
+              { name: '🌐 Phaser', value: 'phaser' },
+              { name: '📳 Tremolo', value: 'tremolo' },
+              { name: '🎸 Vibrato', value: 'vibrato' },
+              { name: '🔙 Reverse', value: 'reverse' },
+              { name: '🔊 Treble', value: 'treble' },
+              { name: '📈 Normalizer', value: 'normalizer' },
+              { name: '🔊 Surround', value: 'surrounding' },
+              { name: '🔊 Sub Boost', value: 'subboost' },
+              { name: '🎤 Karaoke', value: 'karaoke' },
+              { name: '🌀 Flanger', value: 'flanger' },
+              { name: '📉 Compresor', value: 'compressor' },
+              { name: '☕ Lo-Fi', value: 'lofi' },
+              { name: '💥 Earrape', value: 'earrape' },
+              { name: '🎛️ Mono', value: 'mono' },
             )))
     .addSubcommand(sub =>
       sub.setName('clear')
-        .setDescription('Limpia toda la cola de reproducción')),
+        .setDescription('🗑️ Limpia toda la cola de reproducción')),
 
   // --- Spotify ---
   new SlashCommandBuilder()
@@ -249,7 +251,8 @@ const commands = [
   // --- Utility ---
   new SlashCommandBuilder()
     .setName('ping')
-    .setDescription('Muestra la latencia del bot'),      new SlashCommandBuilder()
+    .setDescription('Muestra la latencia del bot'),
+  new SlashCommandBuilder()
     .setName('help')
     .setDescription('Muestra la lista de comandos disponibles'),
 

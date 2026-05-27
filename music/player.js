@@ -94,7 +94,7 @@ async function initPlayer(client) {
         // Autoplay is on, don't send empty queue message
         return;
       }
-      metadata.channel.send('📭 La cola ha terminado. Añade más canciones con `/play play`.').catch(() => {});
+      metadata.channel.send('📭 La cola ha terminado. Añade más canciones con `/play`.').catch(() => {});
     }
   });
 
