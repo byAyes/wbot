@@ -1,10 +1,28 @@
 const { EmbedBuilder } = require('discord.js');
+const AIService = require('../services/aiService');
+const IntentClassifier = require('../services/intentClassifier');
+const KnowledgeBase = require('../services/knowledgeBase');
+const { getLimiter, formatRateLimitMessage } = require('../utils/rateLimiter');
+const db = require('../database/setup');
+
+const aiService = new AIService();
+const intentClassifier = new IntentClassifier();
+const knowledgeBase = new KnowledgeBase();
+
+const SYSTEM_PROMPT = `Eres Carlos, asistente de Discord amigable y útil. 
+Personalidad: cálido, casual, emojis moderadamente, siempre en español.
+Conoces todos los comandos: /play, /music, /spotify, /pinterest, /instagram, /download, /birthday, /reminder, /chat, /help, /weather, /poll, /ping, /invite, /ask, /hos.
+Cuando no sepas algo, usa la base de conocimiento o di que no sabes.
+Mantén respuestas cortas (máximo 280 caracteres cuando sea posible).
+NUNCA des información sensible ni reveles internals del bot.`;
 const logger = require('../utils/logger');
 const { renderDiscordMessage } = require('../utils/messageRenderer');
 const {
   isAlreadyInHallOfShame,
   addHallOfShameEntry,
   getGuildConfig,
+  addConversationMessage,
+  getConversationHistory,
 } = require('../database/setup');
 
 // Rate limiting: cooldown per user (30 seconds)
@@ -21,10 +39,141 @@ module.exports = {
     // Check if bot was mentioned
     if (!message.mentions.has(client.user)) return;
 
-    // Check if message is a reply
-    if (!message.reference?.messageId) return;
+    // === AI CHAT (when NOT a reply) ===
+    if (!message.reference?.messageId) {
+      return handleAIChat(message, client);
+    }
 
-    // Get per-guild configuration
+    // === HALL OF SHAME (when reply + mention) ===
+    return handleHallOfShame(message, client);
+  },
+};
+
+// =====================================================================
+//  AI CHAT HANDLER - Hybrid routing
+// =====================================================================
+async function handleAIChat(message, client) {
+  const userId = message.author.id;
+  const content = message.content.replace(/<@\d+>/g, '').trim();
+
+  if (!content) {
+    await message.reply({
+      content: '👋 ¡Hola! ¿En qué puedo ayudarte? Usa `/help` para ver los comandos o pregúntame algo directamente.',
+      allowedMentions: { repliedUser: false },
+    });
+    return;
+  }
+
+  // Rate limit check
+  const limiter = getLimiter('ai');
+  const { allowed, resetIn } = limiter.check(userId);
+  if (!allowed) {
+    await message.reply({
+      content: formatRateLimitMessage({ resetIn }, 'msg'),
+      allowedMentions: { repliedUser: false },
+    });
+    return;
+  }
+
+  // Show typing indicator
+  try { await message.channel.sendTyping(); } catch {}
+
+  try {
+    // Classify intent
+    const classification = intentClassifier.classify(content);
+    logger.debug(`AI Chat intent: ${classification.intent} (conf: ${classification.confidence})`);
+
+    // If it's a known command with high confidence, route to it
+    if (classification.command && classification.confidence >= 0.5) {
+      const routed = await routeToCommand(message, classification, content);
+      if (routed) return;
+    }
+
+    // Otherwise, use LLM
+    if (!aiService.isConfigured()) {
+      await message.reply({
+        content: '⚠️ La IA no está configurada. Añade OPENAI_API_KEY (o GROQ_API_KEY/ANTHROPIC_API_KEY) en el archivo .env.',
+        allowedMentions: { repliedUser: false },
+      });
+      return;
+    }
+
+    // Get conversation history
+    const history = getConversationHistory(userId, 6);
+
+    // Search knowledge base for context
+    const relevantChunks = knowledgeBase.search(content, 2);
+    const context = relevantChunks.length > 0
+      ? `\n\nContexto de la base de conocimiento:\n${relevantChunks.join('\n---\n')}`
+      : '';
+
+    // Build messages array
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT + context },
+      ...history.map(h => ({ role: h.role, content: h.content })),
+      { role: 'user', content: content },
+    ];
+
+    // Call LLM
+    const result = await aiService.chat(messages);
+
+    // Store conversation
+    addConversationMessage(userId, 'user', content, message.guild?.id, message.channelId, classification.intent);
+    addConversationMessage(userId, 'assistant', result.content, message.guild?.id, message.channelId, classification.intent, result.tokensUsed);
+
+    // Build response embed
+    const embed = new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setAuthor({ name: message.author.username, iconURL: message.author.displayAvatarURL() })
+      .setDescription(result.content)
+      .setFooter({ text: `🤖 ${aiService.provider} • ${result.tokensUsed} tokens` })
+      .setTimestamp();
+
+    await message.reply({ embeds: [embed], allowedMentions: { repliedUser: false } });
+
+  } catch (error) {
+    logger.error('Error en AI chat:', error.message);
+    await message.reply({
+      content: `❌ Error al procesar tu mensaje: ${error.message}`,
+      allowedMentions: { repliedUser: false },
+    });
+  }
+}
+
+/**
+ * Routes a classified intent to a helpful response
+ */
+async function routeToCommand(message, classification, content) {
+  const { command } = classification;
+
+  const routingMessages = {
+    play: '🎵 Detecté que quieres reproducir música. Usa el comando `/play <query>` directamente para mejores resultados.',
+    download: '📥 Detecté que quieres descargar. Usa `/download <url>` o `/music download <query>`.',
+    reminder: '⏰ Detecté que quieres un recordatorio. Usa `/reminder set <fecha> <mensaje>`.',
+    birthday: '🎂 Detecté que hablas de cumpleaños. Usa `/birthday` para gestionarlos.',
+    help: '📚 Usa `/help` para ver todos los comandos disponibles.',
+    invite: '🔗 Usa `/invite` para obtener el enlace de invitación.',
+    utility: '🔧 Usa `/ping` para ver la latencia del bot.',
+    weather: '🌤️ Usa `/weather <ciudad>` para ver el clima.',
+    poll: '📊 Usa `/poll` para crear una encuesta.',
+    hos: '🏆 Para usar el Hall of Shame, responde a un mensaje mencionándome.',
+  };
+
+  if (routingMessages[command]) {
+    await message.reply({
+      content: routingMessages[command],
+      allowedMentions: { repliedUser: false },
+    });
+    return true;
+  }
+
+  return false;
+}
+
+// =====================================================================
+//  HALL OF SHAME HANDLER (existing logic)
+// =====================================================================
+async function handleHallOfShame(message, client) {
     const config = getGuildConfig(message.guild.id);
     if (!config.hos_enabled) return;
     if (!config.hos_channel_id) {
@@ -250,5 +399,4 @@ module.exports = {
         try { await message.react('❌'); } catch {}
       }
     }
-  },
-};
+  }

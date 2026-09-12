@@ -65,6 +65,42 @@ function initTables() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // --- AI Conversation History ---
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS conversation_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      guild_id TEXT,
+      channel_id TEXT,
+      role TEXT NOT NULL, -- 'user' | 'assistant' | 'system'
+      content TEXT NOT NULL,
+      intent TEXT, -- classified intent if any
+      tokens_used INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_conv_user ON conversation_history(user_id, created_at DESC)
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      guild_id TEXT NOT NULL,
+      channel_id TEXT NOT NULL,
+      message TEXT NOT NULL,
+      remind_at DATETIME NOT NULL,
+      sent INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reminders_pending ON reminders(sent, remind_at)
+  `);
 }
 
 // --- Birthday CRUD ---
@@ -279,4 +315,81 @@ module.exports = {
   setHosChannel,
   setHosRole,
   setHosEnabled,
+
+  // --- Conversation History ---
+  addConversationMessage,
+  getConversationHistory,
+  clearConversationHistory,
+
+  // --- Reminders ---
+  createReminder,
+  getPendingReminders,
+  markReminderSent,
+  getUserReminders,
+  deleteReminder,
 };
+
+// --- Conversation History CRUD ---
+
+function addConversationMessage(userId, role, content, guildId = null, channelId = null, intent = null, tokensUsed = 0) {
+  const db = getDatabase();
+  return db.prepare(`
+    INSERT INTO conversation_history (user_id, guild_id, channel_id, role, content, intent, tokens_used)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(userId, guildId, channelId, role, content, intent, tokensUsed);
+}
+
+function getConversationHistory(userId, limit = 10) {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT role, content, intent, created_at
+    FROM conversation_history
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(userId, limit).reverse(); // Return chronological order
+}
+
+function clearConversationHistory(userId) {
+  const db = getDatabase();
+  return db.prepare('DELETE FROM conversation_history WHERE user_id = ?').run(userId);
+}
+
+// --- Reminders CRUD ---
+
+function createReminder(userId, guildId, channelId, message, remindAt) {
+  const db = getDatabase();
+  return db.prepare(`
+    INSERT INTO reminders (user_id, guild_id, channel_id, message, remind_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userId, guildId, channelId, message, remindAt);
+}
+
+function getPendingReminders(beforeTime) {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT * FROM reminders
+    WHERE sent = 0 AND remind_at <= ?
+    ORDER BY remind_at ASC
+  `).all(beforeTime);
+}
+
+function markReminderSent(id) {
+  const db = getDatabase();
+  return db.prepare('UPDATE reminders SET sent = 1 WHERE id = ?').run(id);
+}
+
+function getUserReminders(userId, limit = 50) {
+  const db = getDatabase();
+  return db.prepare(`
+    SELECT * FROM reminders
+    WHERE user_id = ? AND sent = 0
+    ORDER BY remind_at ASC
+    LIMIT ?
+  `).all(userId, limit);
+}
+
+function deleteReminder(id, userId) {
+  const db = getDatabase();
+  return db.prepare('DELETE FROM reminders WHERE id = ? AND user_id = ?').run(id, userId);
+}

@@ -5,25 +5,53 @@
 [![discord.js](https://img.shields.io/badge/Library-discord.js-5865F2?style=for-the-badge&logo=discord)](https://discord.js.org/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite)](https://www.sqlite.org/)
 
-> **Carlos** es un bot de Discord todo-en-uno para descargar contenido multimedia de YouTube, Spotify, Instagram y Pinterest, además de utilidades como registro de cumpleaños.
+> **Carlos** es un bot de Discord todo-en-uno con **IA híbrida**: descarga multimedia (YouTube, Spotify, Instagram, Pinterest), música en voz, recordatorios, encuestas, clima y un asistente de IA conversacional.
 
 ---
 
 ## ✨ Funcionalidades
 
+### 🎵 Música y Multimedia
 | Comando | Descripción |
 |---------|-------------|
-| `/play <query> [formato]` | Busca y descarga audio/video de YouTube |
-| `/spotify <query>` | Busca información y descarga canciones de Spotify |
+| `/play <query>` | Busca y reproduce audio/video de YouTube, Spotify, SoundCloud, Deezer |
+| `/music download <query> [fmt]` | Descarga audio/video |
+| `/music skip/stop/pause/resume` | Control de reproducción |
+| `/music queue/nowplaying` | Ver cola y canción actual |
+| `/music volume <1-100>` | Ajustar volumen |
+| `/music shuffle/loop` | Modos de reproducción |
+| `/music filters <filtro>` | Efectos de audio (20 presets) |
+| `/spotify <query>` | Busca y descarga canciones de Spotify |
 | `/pinterest <url>` | Descarga imágenes/videos de Pinterest |
 | `/instagram <url>` | Descarga videos y reels de Instagram |
-| `/download <url> [formato]` | Descarga desde enlaces directos con yt-dlp |
+| `/download <url> [fmt]` | Descarga desde enlaces directos |
+
+### 🤖 IA Híbrida
+| Comando | Descripción |
+|---------|-------------|
+| `/chat <pregunta>` | Habla con la IA de Carlos (lenguaje natural) |
+| `/ask <pregunta>` | Pregunta rápida a la IA |
+| `@Carlos <mensaje>` | Menciona al bot para conversar (sin comando) |
+
+### ⏰ Utilidades
+| Comando | Descripción |
+|---------|-------------|
 | `/birthday set <DD-MM-YYYY>` | Guarda tu fecha de cumpleaños |
 | `/birthday list` | Muestra los próximos cumpleaños |
-| `/birthday get` | Muestra tu cumpleaños guardado |
-| `/birthday delete` | Elimina tu cumpleaños |
+| `/reminder set <fecha> <mensaje>` | Configura un recordatorio |
+| `/reminder list` | Ver recordatorios pendientes |
+| `/reminder delete <id>` | Eliminar un recordatorio |
+| `/weather <ciudad>` | Consulta el clima |
+| `/poll <pregunta> [opciones]` | Crea una encuesta |
 | `/ping` | Muestra la latencia del bot |
-| `/help` | Muestra todos los comandos disponibles |
+| `/help` | Muestra todos los comandos |
+
+### 🏆 Moderación
+| Comando | Descripción |
+|---------|-------------|
+| `/hos setup` | Configurar Hall of Shame (Admin) |
+| `/hos ranking` | Usuarios más nominados |
+| `/hos recent` | Últimas entradas |
 
 ---
 
