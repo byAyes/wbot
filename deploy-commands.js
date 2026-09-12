@@ -264,6 +264,78 @@ const commands = [
       option.setName('target')
         .setDescription('Comando específico a recargar')
         .setRequired(false)),
+
+  // --- AI Chat ---
+  new SlashCommandBuilder()
+    .setName('chat')
+    .setDescription('🤖 Habla con la IA de Carlos')
+    .addStringOption(option =>
+      option.setName('pregunta')
+        .setDescription('Tu pregunta o comando en lenguaje natural')
+        .setRequired(true)
+        .setMaxLength(500)),
+
+  // --- AI Ask (quick) ---
+  new SlashCommandBuilder()
+    .setName('ask')
+    .setDescription('❓ Haz una pregunta rápida a la IA')
+    .addStringOption(option =>
+      option.setName('pregunta')
+        .setDescription('Tu pregunta')
+        .setRequired(true)
+        .setMaxLength(500)),
+
+  // --- Weather ---
+  new SlashCommandBuilder()
+    .setName('weather')
+    .setDescription('🌤️ Consulta el clima de una ciudad')
+    .addStringOption(option =>
+      option.setName('ciudad')
+        .setDescription('Nombre de la ciudad (ej: Madrid, Nueva York)')
+        .setRequired(true)
+        .setMaxLength(100)),
+
+  // --- Poll ---
+  new SlashCommandBuilder()
+    .setName('poll')
+    .setDescription('📊 Crea una encuesta con botones de reacción')
+    .addStringOption(option =>
+      option.setName('pregunta')
+        .setDescription('La pregunta de la encuesta')
+        .setRequired(true)
+        .setMaxLength(200))
+    .addStringOption(option =>
+      option.setName('opciones')
+        .setDescription('Opciones separadas por coma (máx 5, ej: "Sí, No, Tal vez")')
+        .setRequired(false)
+        .setMaxLength(200)),
+
+  // --- Reminder ---
+  new SlashCommandBuilder()
+    .setName('reminder')
+    .setDescription('⏰ Gestiona recordatorios')
+    .addSubcommand(sub =>
+      sub.setName('set')
+        .setDescription('Configura un recordatorio')
+        .addStringOption(option =>
+          option.setName('fecha')
+            .setDescription('Formato: DD-MM-YYYY HH:MM (ej: 25-12-2024 15:30)')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('mensaje')
+            .setDescription('El mensaje del recordatorio (máx 200 caracteres)')
+            .setRequired(true)
+            .setMaxLength(200)))
+    .addSubcommand(sub =>
+      sub.setName('list')
+        .setDescription('Muestra tus recordatorios pendientes'))
+    .addSubcommand(sub =>
+      sub.setName('delete')
+        .setDescription('Elimina un recordatorio')
+        .addIntegerOption(option =>
+          option.setName('id')
+            .setDescription('ID del recordatorio a eliminar')
+            .setRequired(true))),
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);

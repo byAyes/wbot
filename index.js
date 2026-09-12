@@ -3,7 +3,12 @@ const { Client, GatewayIntentBits, Collection, Events, MessageFlags } = require(
 const fs = require('fs');
 const path = require('path');
 const logger = require('./utils/logger');
-const { initPlayer } = require('./music/player');
+const { initPlayer, waitForNodesOnline } = require('./music/player');
+const ReminderService = require('./services/reminderService');
+const AIService = require('./services/aiService');
+const IntentClassifier = require('./services/intentClassifier');
+const KnowledgeBase = require('./services/knowledgeBase');
+const { getLimiter, formatRateLimitMessage } = require('./utils/rateLimiter');
 
 // --- Client Setup ---
 const client = new Client({
@@ -17,6 +22,18 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+
+// --- Global Services ---
+const reminderService = new ReminderService();
+const aiService = new AIService();
+const intentClassifier = new IntentClassifier();
+const knowledgeBase = new KnowledgeBase();
+
+// Set reminder service reference on reminder command
+const reminderCommand = require('./commands/reminder');
+if (reminderCommand.setReminderService) {
+  reminderCommand.setReminderService(reminderService);
+}
 
 // --- Load Commands ---
 const commandsPath = path.join(__dirname, 'commands');
@@ -58,12 +75,35 @@ client.once(Events.ClientReady, async (c) => {
   logger.info(`Servidores: ${c.guilds.cache.size}`);
   logger.info(`Comandos: ${client.commands.size}`);
 
-  // Initialize music player
+  // Start reminder service
+  reminderService.start();
+  reminderService.onReminder = async (reminder) => {
+    try {
+      const channel = await client.channels.fetch(reminder.channel_id);
+      if (channel && channel.isTextBased()) {
+        await channel.send({
+          content: `⏰ <@${reminder.user_id}> Recordatorio: **${reminder.message}**`,
+        });
+      }
+      logger.info(`Recordatorio enviado: ${reminder.id}`);
+    } catch (error) {
+      logger.error('Error enviando recordatorio:', error.message);
+    }
+  };
+
+  // Log AI status
+  if (aiService.isConfigured()) {
+    logger.success(`IA configurada: ${aiService.provider} (${aiService._getModel()})`);
+  } else {
+    logger.warn('IA no configurada. Añade OPENAI_API_KEY, GROQ_API_KEY o ANTHROPIC_API_KEY en .env');
+  }
+
   try {
     await initPlayer(client);
-    logger.success('Sistema de música inicializado correctamente');
+    await waitForNodesOnline();
+    logger.success('Sistema de música conectado correctamente');
   } catch (error) {
-    logger.error('Error al inicializar sistema de música:', error.message);
+    logger.error('Error al conectar sistema de música:', error.message);
   }
 
   logger.divider();
@@ -105,6 +145,13 @@ process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception:', error);
 });
 
+// --- Graceful shutdown ---
+process.on('SIGINT', () => {
+  logger.info('Cerrando el bot gracefulmente...');
+  reminderService.stop();
+  process.exit(0);
+});
+
 // --- Login ---
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -112,6 +159,13 @@ if (!token) {
   process.exit(1);
 }
 
-client.login(token);
+async function bootstrap() {
+  await client.login(token);
+}
+
+bootstrap().catch((error) => {
+  logger.error('Error fatal al iniciar el bot:', error);
+  process.exit(1);
+});
 
 module.exports = client;
