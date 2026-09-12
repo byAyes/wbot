@@ -43,6 +43,7 @@ const {
   getKazagumo,
   getPlayer,
   getQueue,
+  destroyPlayerSafely,
 
   // Logger
   logger,
@@ -444,6 +445,9 @@ async function handleSkip(interaction) {
   const { queue: player } = queueCheck;
 
   const currentTrack = player.currentTrack;
+  if (!currentTrack) {
+    return interaction.reply({ content: '❌ No hay canción actual para saltar.', flags: MessageFlags.Ephemeral });
+  }
   player.skip();
 
   const embed = new EmbedBuilder()
@@ -459,7 +463,7 @@ async function handleStop(interaction) {
   if (!queueCheck.valid) return interaction.reply({ content: queueCheck.error, flags: MessageFlags.Ephemeral });
   const { queue: player } = queueCheck;
 
-  player.destroy();
+  await destroyPlayerSafely(interaction.guildId, 'stop command');
 
   const embed = new EmbedBuilder()
     .setColor(0xED4245)
@@ -478,7 +482,7 @@ async function handlePause(interaction) {
     return interaction.reply({ content: '⚠️ Ya está pausada. Usa `/music resume`.', flags: MessageFlags.Ephemeral });
   }
 
-  player.pause();
+  await player.pause();
 
   const embed = new EmbedBuilder()
     .setColor(0xFEE75C)
@@ -497,7 +501,7 @@ async function handleResume(interaction) {
     return interaction.reply({ content: '⚠️ No está pausada.', flags: MessageFlags.Ephemeral });
   }
 
-  player.resume();
+  await player.resume();
 
   const embed = new EmbedBuilder()
     .setColor(0x57F287)
@@ -539,7 +543,7 @@ async function handleVolume(interaction) {
   const { queue: player } = queueCheck;
 
   const volume = interaction.options.getInteger('nivel');
-  player.setVolume(volume);
+  await player.setVolume(volume);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -687,6 +691,10 @@ async function handleSeek(interaction) {
   const targetMs = targetSeconds * 1000;
   const trackDuration = player.currentTrack?.length || 0;
 
+  if (!player.currentTrack) {
+    return interaction.reply({ content: '❌ No hay canción actual para adelantar.', flags: MessageFlags.Ephemeral });
+  }
+
   if (targetMs > trackDuration) {
     return interaction.reply({
       content: `❌ El tiempo máximo es ${formatDurationMs(trackDuration)} (${Math.floor(trackDuration / 1000)}s).`,
@@ -694,7 +702,7 @@ async function handleSeek(interaction) {
     });
   }
 
-  player.seek(targetMs);
+  await player.seek(targetMs);
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
@@ -787,7 +795,7 @@ async function handleFilters(interaction) {
 
   try {
     // Toggle the filter (setPreset toggles on/off)
-    player.filterManager.setPreset(filterName);
+    await player.filterManager.setPreset(filterName);
 
     const embed = new EmbedBuilder()
       .setColor(wasEnabled ? 0xED4245 : 0x57F287)

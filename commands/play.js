@@ -7,19 +7,42 @@ const {
   getDeezerTrackInfo,
   extractDeezerID,
   validateVoiceChannel,
+  ensureKazagumoReady,
   getKazagumo,
+  queueTracksForPlayback,
   logger,
 } = require('../music/helpers');
 
-// ========== COMMAND DEFINITION ==========
+function playbackErrorMessage(error) {
+  const message = error?.message || String(error);
+  const lower = message.toLowerCase();
+
+  if (lower.includes('no nodes are online') || lower.includes('nodos lavalink')) {
+    return 'Lavalink no tiene nodos online. Reinicia Lavalink y el bot, luego intenta de nuevo.';
+  }
+  if (lower.includes('voice connection') || lower.includes('connection is not established')) {
+    return 'No pude unirme al canal de voz. Revisa que tenga permisos de Conectar/Hablar y que el canal no esté lleno.';
+  }
+  if (lower.includes('ffmpeg') || lower.includes('encoder')) {
+    return 'FFmpeg no está disponible para reproducir audio.';
+  }
+  if (lower.includes('connect') || lower.includes('econnrefused') || lower.includes('socket')) {
+    return 'No se pudo conectar bien con Lavalink. Revisa que el contenedor esté activo y reinicia el bot.';
+  }
+  if (lower.includes('youtube') || lower.includes('signature') || lower.includes('cipher')) {
+    return 'YouTube rechazó la reproducción en Lavalink. Actualiza/reinicia el plugin de YouTube de Lavalink.';
+  }
+
+  return `Error al reproducir: ${message}`;
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('play')
-    .setDescription('🎵 Reproduce música en tu canal de voz (YouTube, Spotify, SoundCloud, Deezer)')
+    .setDescription('Reproduce música en tu canal de voz')
     .addStringOption(option =>
       option.setName('query')
-        .setDescription('Nombre de la canción o URL (YouTube/Spotify/SoundCloud/Deezer)')
+        .setDescription('Nombre de la canción o URL')
         .setRequired(true)),
 
   async execute(interaction) {
@@ -27,6 +50,7 @@ module.exports = {
     if (!voiceCheck.valid) {
       return interaction.reply({ content: voiceCheck.error, flags: MessageFlags.Ephemeral });
     }
+
     const { channel: voiceChannel } = voiceCheck;
     const query = interaction.options.getString('query');
     const deezerId = extractDeezerID(query);
@@ -34,15 +58,15 @@ module.exports = {
     await interaction.deferReply();
 
     try {
+      await ensureKazagumoReady(20000);
       const kazagumo = getKazagumo();
 
-      // --- Deezer URL: fetch track info, then search on YouTube via Lavalink ---
       if (deezerId) {
-        await interaction.editReply({ content: '📻 Obteniendo información de Deezer...' });
+        await interaction.editReply({ content: 'Obteniendo información de Deezer...' });
         const trackInfo = await getDeezerTrackInfo(deezerId);
 
         await interaction.editReply({
-          content: `🔍 Buscando "${trackInfo.title}" de ${trackInfo.artist} en YouTube...`,
+          content: `Buscando "${trackInfo.title}" de ${trackInfo.artist} en YouTube...`,
         });
 
         const searchResult = await kazagumo.search(`${trackInfo.artist} - ${trackInfo.title}`, {
@@ -50,73 +74,52 @@ module.exports = {
           engine: 'youtube',
         });
 
-        if (!searchResult || !searchResult.tracks.length) {
-          return interaction.editReply({ content: '❌ No se encontró esta canción en YouTube.' });
+        if (!searchResult?.tracks?.length) {
+          return interaction.editReply({ content: 'No encontré esa canción en YouTube.' });
         }
 
         let track = searchResult.tracks[0];
-
         if (searchResult.tracks.length > 1) {
           const selected = await showTrackSelection(interaction, searchResult.tracks);
           if (!selected) return;
           track = selected;
         }
 
-        await interaction.editReply({
-          content: `📻 **${trackInfo.title}** - *${trackInfo.artist}* (Deezer → YouTube)`,
-          components: [],
-        });
-
-        const player = await kazagumo.play(voiceChannel, track, {
-          requester: interaction.user,
-        });
-        player.data = { channel: interaction.channel };
-
-        if (player.currentTrack) {
-          const embed = createNowPlayingEmbed(player, player.currentTrack);
-          await interaction.editReply({ content: null, embeds: [embed] });
-        }
-        return;
+        const player = await queueTracksForPlayback(interaction, voiceChannel, track);
+        const embed = createNowPlayingEmbed(player, player.queue.current || track);
+        return interaction.editReply({ content: null, components: [], embeds: [embed] });
       }
 
-      // --- Normal search with Kazagumo (handles YT/Spotify/SC URLs automatically) ---
       const searchResult = await kazagumo.search(query, {
         requester: interaction.user,
       });
 
-      if (!searchResult || !searchResult.tracks.length) {
-        return interaction.editReply({ content: '❌ No se encontraron resultados para tu búsqueda.' });
+      if (!searchResult?.tracks?.length) {
+        return interaction.editReply({ content: 'No encontré resultados para tu búsqueda.' });
       }
 
-      // If it's a playlist
       if (searchResult.type === 'PLAYLIST') {
-        const playlist = searchResult.playlist;
-        const player = await kazagumo.play(voiceChannel, searchResult, {
-          requester: interaction.user,
-        });
-        player.data = { channel: interaction.channel };
+        const player = await queueTracksForPlayback(interaction, voiceChannel, searchResult.tracks);
+        const playlistName = searchResult.playlistName || 'Playlist';
+        const duration = searchResult.tracks.reduce((total, track) => total + (track.length || 0), 0);
+        const thumbnailTrack = searchResult.tracks.find(track => track.thumbnail || track.artworkUrl);
 
         const embed = new EmbedBuilder()
           .setColor(0x5865F2)
-          .setTitle('📑 Lista añadida a la cola')
-          .setDescription(`**[${playlist.name || playlist.title}](${playlist.url || playlist.uri})**`)
+          .setTitle('Lista añadida a la cola')
+          .setDescription(`**${playlistName}**`)
           .addFields(
-            { name: '👤 Autor', value: playlist.author || 'Desconocido', inline: true },
-            { name: '🎵 Canciones', value: `${searchResult.tracks.length}`, inline: true },
-            { name: '⏱️ Duración', value: formatDurationMs(playlist.duration || playlist.length || 0), inline: true },
-          );
+            { name: 'Canciones', value: `${searchResult.tracks.length}`, inline: true },
+            { name: 'Duración', value: formatDurationMs(duration), inline: true },
+            { name: 'En cola', value: `${player.queue.length} pendientes`, inline: true },
+          )
+          .setTimestamp();
 
-        if (playlist.thumbnail || playlist.artworkUrl) {
-          embed.setThumbnail(playlist.thumbnail || playlist.artworkUrl);
-        }
-        embed.setTimestamp();
-
+        if (thumbnailTrack) embed.setThumbnail(thumbnailTrack.thumbnail || thumbnailTrack.artworkUrl);
         return interaction.editReply({ embeds: [embed] });
       }
 
-      // --- Track selection UI if multiple results ---
       let track = searchResult.tracks[0];
-
       if (searchResult.tracks.length > 1) {
         const selected = await showTrackSelection(interaction, searchResult.tracks);
         if (!selected) return;
@@ -124,30 +127,22 @@ module.exports = {
       }
 
       await interaction.editReply({
-        content: `${getSourceIcon(track)} **${track.title}** - *${track.author}*`,
+        content: `${getSourceIcon(track)} **${track.title || 'Sin título'}** - *${track.author || 'Desconocido'}*`,
         components: [],
       });
 
-      const player = await kazagumo.play(voiceChannel, track, {
-        requester: interaction.user,
-      });
-      player.data = { channel: interaction.channel };
-
-      if (player.currentTrack) {
-        const embed = createNowPlayingEmbed(player, player.currentTrack);
-        await interaction.editReply({ content: null, embeds: [embed] });
-      }
-
+      const player = await queueTracksForPlayback(interaction, voiceChannel, track);
+      const embed = createNowPlayingEmbed(player, player.queue.current || track);
+      return interaction.editReply({ content: null, embeds: [embed] });
     } catch (error) {
       logger.error('Error en /play:', error);
-      let errorMsg = `❌ Error al reproducir: ${error.message}`;
-      if (error.message?.toLowerCase().includes('ffmpeg') || error.message?.toLowerCase().includes('encoder')) {
-        errorMsg = '❌ FFmpeg no está instalado. Asegúrate de que ffmpeg esté disponible en el sistema.';
-      } else if (error.message?.includes('connect') || error.message?.includes('ECONNREFUSED')) {
-        errorMsg = '❌ No se pudo conectar al servidor Lavalink. Asegúrate de que esté ejecutándose.';
+      const errorMsg = playbackErrorMessage(error);
+
+      try {
+        return interaction.editReply({ content: errorMsg, components: [] });
+      } catch {
+        return interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral });
       }
-      try { await interaction.editReply({ content: errorMsg }); }
-      catch { await interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral }); }
     }
   },
 };

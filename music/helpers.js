@@ -1,7 +1,18 @@
 const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, AttachmentBuilder } = require('discord.js');
 const { json } = require('@distube/yt-dlp');
 const axios = require('axios');
-const { getQueue, getPlayer, getKazagumo } = require('./player');
+const {
+  getQueue,
+  getPlayer,
+  getKazagumo,
+  hasOnlineNodes,
+  waitForNodesOnline,
+  applyPlayerCompatibility,
+  ensureKazagumoReady,
+  getOrCreateMusicPlayer,
+  queueTracksForPlayback,
+  destroyPlayerSafely,
+} = require('./player');
 const logger = require('../utils/logger');
 
 // ========== CONSTANTS ==========
@@ -58,8 +69,11 @@ function formatDurationMs(ms) {
 
 function formatRepeatMode(mode) {
   switch (mode) {
+    case 'none':
     case 0: return '❌ Desactivado';
+    case 'track':
     case 1: return '🔂 Canción';
+    case 'queue':
     case 2: return '🔁 Cola';
     default: return '❌ Desactivado';
   }
@@ -143,6 +157,13 @@ function createProgressBar(currentMs, totalMs, length = 15) {
 // ========== EMBED BUILDERS ==========
 
 function createNowPlayingEmbed(player, track) {
+  if (!track) {
+    return new EmbedBuilder()
+      .setColor(0x5865F2)
+      .setTitle('No hay canción reproduciéndose')
+      .setTimestamp();
+  }
+
   const progress = createProgressBar(player.position, track.length);
   const activeFilters = getActiveFilters(player);
   const sourceIcon = getSourceIcon(track);
@@ -191,16 +212,22 @@ function createQueueEmbed(player) {
 
   const embed = new EmbedBuilder()
     .setColor(0x5865F2)
-    .setTitle('📋 Cola de Reproducción')
-    .setDescription(
+    .setTitle('📋 Cola de Reproducción');
+
+  if (currentTrack) {
+    embed.setDescription(
       `**Reproduciendo ahora:**\n` +
       `${sourceIcon} **[${currentTrack.title}](${currentTrack.uri})** - *${currentTrack.author}*\n` +
       `└ Solicitado por ${currentTrack.requester}`,
-    )
-    .addFields(
-      { name: '🔁 Repetición', value: repeatLabel, inline: true },
-      { name: '🔊 Volumen', value: `${player.volume}%`, inline: true },
     );
+  } else {
+    embed.setDescription('No hay una canción activa en este momento.');
+  }
+
+  embed.addFields(
+    { name: '🔁 Repetición', value: repeatLabel, inline: true },
+    { name: '🔊 Volumen', value: `${player.volume}%`, inline: true },
+  );
 
   const activeFilters = getActiveFilters(player);
   if (activeFilters.length > 0) {
@@ -497,6 +524,13 @@ module.exports = {
   getKazagumo,
   getPlayer,
   getQueue,
+  hasOnlineNodes,
+  waitForNodesOnline,
+  applyPlayerCompatibility,
+  ensureKazagumoReady,
+  getOrCreateMusicPlayer,
+  queueTracksForPlayback,
+  destroyPlayerSafely,
 
   // Logger
   logger,
